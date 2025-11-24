@@ -1,0 +1,120 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Certificates and Keys
+certificates/*.key
+certificates/*.pem
+certificates/ca.key
+certificates/broker.key
+certificates/camera_client.key
+*.key
+*.pem
+
+# Keep certificate templates
+!certificates/README.md
+!certificates/.gitkeep
+
+# Logs
+logs/*.log
+logs/*.log.*
+*.log
+
+# PID files
+pids/*.pid
+
+# Data directories
+data/uploads/*
+data/mqtt/*
+data/*.db
+data/*.db-journal
+
+# Keep data structure
+!data/.gitkeep
+!data/uploads/.gitkeep
+!data/mqtt/.gitkeep
+
+# Camera files (generated)
+camera_files/mqttCA.crt
+camera_files/mqtt.pem
+camera_files/mqtt.key
+camera_files/checksums.txt
+
+# Deployment files (generated)
+deployment/DEPLOYMENT_GUIDE.md
+deployment/*.sh
+
+# Backup files
+backup/
+*.backup
+*.tar.gz
+*.zip
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Documentation build
+docs/_build/
+docs/.doctrees/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# EMQX
+emqx/data/
+emqx/log/
+
+# Kurento
+kurento-logs/
+
+# Node modules (if any)
+node_modules/
+
+# Archive (keep for rollback, but don't commit)
+archive/
