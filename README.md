@@ -1,206 +1,263 @@
 # VBC01 Camera Platform - Local MQTT Edition
 
-**A fully offline-capable camera management platform using EMQX local MQTT broker**
+**Fully offline-capable home security camera platform with WebRTC livestreaming**
 
-## Overview
+No cloud dependencies. No AWS account. No internet required. Complete privacy.
 
-This is a complete rewrite of the VBC01 camera management platform, designed to work entirely on your local network without any cloud dependencies. No AWS account required, no internet needed for camera operation.
+---
 
-## Key Features
+## 🎯 What is This?
 
-- ✅ **Fully Offline Operation** - Works without internet connectivity
-- ✅ **Local EMQX MQTT Broker** - Compatible with AWS IoT SDK v2.1.1
-- ✅ **Zero Cloud Dependencies** - No AWS IoT Core required
-- ✅ **Telegram Notifications** - Motion/person detection with thumbnails
-- ✅ **WebRTC Livestreaming** - Real-time camera viewing
-- ✅ **Encrypted Recordings** - Automatic recording storage and playback
-- ✅ **Web Dashboard** - Camera control and event monitoring
-- ✅ **One-Command Setup** - Automated platform deployment
+A self-hosted camera management platform for VBC01 (Hive) cameras that runs entirely on your local network using EMQX MQTT broker instead of AWS IoT Core.
 
-## Quick Start
+**Key Features:**
+- 📹 Live streaming (WebRTC) from anywhere
+- 🔔 Instant notifications with thumbnails (Telegram)
+- 💾 Encrypted recording storage and playback
+- 🌐 Web dashboard for camera control
+- 🔒 Complete privacy - all data stays on your server
+- ⚡ One-command automated setup
 
-### Prerequisites
+---
 
-- Linux server (Ubuntu 22.04+ recommended)
-- Python 3.8+
-- Domain name pointing to your server
-- Telegram bot token
+## 📖 Start Here - User Journey
 
-### Installation
+### **Scenario 1: I'm Starting Fresh**
+*I have a new Ubuntu server and want to set up everything from scratch*
+
+→ **Go to: [Complete Deployment Guide](docs/DEPLOYMENT_GUIDE.md)**
+
+This guide walks you through:
+1. Installing all infrastructure (EMQX, Kurento, TURN server)
+2. Setting up the platform
+3. Adding your first camera
+4. Testing everything works
+
+**Time required:** 2-3 hours
+
+---
+
+### **Scenario 2: I Already Have Infrastructure**
+*I have EMQX/Kurento installed, just need the platform*
+
+→ **Quick Setup:**
 
 ```bash
-# Clone repository
-git clone <repo-url> camera-platform-local
+# 1. Clone repository
+git clone https://github.com/SatinderPahwa/camera-platform-local.git
 cd camera-platform-local
 
-# Run setup wizard (auto-generates everything)
+# 2. Install Python dependencies
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Run automated setup wizard
 python3 setup_platform.py
 
-# Start services
+# 4. Start services
 ./scripts/managed_start.sh start
+
+# 5. Add cameras
+python3 tools/add_camera.py <CAMERA_ID>
 ```
 
-That's it! The setup wizard will:
-- Generate all TLS certificates
-- Configure EMQX broker
-- Create camera deployment files
-- Set up all services
-- Generate personalized deployment guide
+**Need details?** See [Platform Setup Only](docs/DEPLOYMENT_GUIDE.md#platform-setup)
 
-## Architecture
+---
 
-```
-VBC01 Cameras → EMQX Broker (Local, Port 8883)
-                    ↓
-              MQTT Processor → Database
-                    ↓
-         Telegram Notifications
-                    ↓
-         Web Dashboard (Port 5000)
+### **Scenario 3: I Need to Add More Cameras**
+*Platform is running, I want to add another camera*
+
+→ **Go to: [Camera Setup Guide](docs/CAMERA_SETUP.md)**
+
+Quick steps:
+```bash
+python3 tools/add_camera.py <CAMERA_ID>
+# Follow prompts to FTP certificates to camera
 ```
 
-**No AWS, No Cloud, No Internet Required!**
+---
 
-## Documentation
+### **Scenario 4: Something's Not Working**
+*I have issues with cameras, streaming, or notifications*
 
-- [Setup Guide](docs/SETUP_GUIDE.md) - Complete installation instructions
-- [Architecture](docs/ARCHITECTURE.md) - System design and components
-- [Camera Setup](docs/CAMERA_SETUP.md) - Adding cameras to platform
-- [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) - Server deployment
-- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
+→ **Go to: [Troubleshooting Guide](docs/TROUBLESHOOTING.md)**
 
-## Components
+Common issues:
+- Camera won't connect → Check EMQX and certificates
+- No livestream → TURN server configuration
+- No notifications → Telegram token/chat ID
 
-- **EMQX Broker** - Local MQTT broker (port 8883)
-- **Config Server** - Provides certificates to cameras (port 80)
-- **MQTT Processor** - Processes camera events and notifications
-- **Dashboard Server** - Web interface for camera management (port 5000)
-- **Telegram Notifier** - Sends motion/person alerts with thumbnails
-- **Livestreaming** - Kurento Media Server for WebRTC streaming
+---
 
-## Camera Support
+## 🏗️ System Architecture
+
+```
+┌─────────────────┐
+│  VBC01 Cameras  │  (Your home security cameras)
+└────────┬────────┘
+         │ MQTT/TLS (port 8883)
+         ↓
+┌─────────────────┐
+│  EMQX Broker    │  (Local MQTT server)
+└────────┬────────┘
+         │
+         ↓
+┌─────────────────┐
+│ MQTT Processor  │  (Event processing + notifications)
+└────────┬────────┘
+         │
+         ↓
+┌─────────────────┐
+│    Database     │  (SQLite - events, recordings)
+└─────────────────┘
+
+┌─────────────────┐
+│ Web Dashboard   │  (https://your-domain.com)
+└─────────────────┘
+
+┌─────────────────┐
+│ Kurento + TURN  │  (Livestreaming from anywhere)
+└─────────────────┘
+```
+
+**No AWS. No Cloud. All Local.**
+
+---
+
+## 📋 Requirements
+
+### **What You Need:**
+
+1. **Ubuntu Server** (22.04 LTS recommended)
+   - 4GB RAM minimum, 8GB recommended
+   - 50GB disk space (SSD recommended)
+   - Static IP address
+
+2. **Domain Name** (REQUIRED)
+   - Must point to your server
+   - Example: `camera.yourdomain.com`
+   - Needed for SSL and camera connections
+
+3. **Telegram Bot** (for notifications)
+   - Create bot with @BotFather
+   - Get your chat ID from @userinfobot
+
+4. **Port Forwarding** (if accessing remotely)
+   - See [DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md#firewall-configuration)
+
+### **What Gets Installed:**
+
+- **EMQX 5.8.8** - MQTT broker
+- **Kurento 7.0.1** - WebRTC media server
+- **coturn** - TURN/STUN server (REQUIRED for remote streaming)
+- **Nginx** - Reverse proxy
+- **Python 3.8+** - Platform runtime
+- **SSL Certificates** - Let's Encrypt (free)
+
+---
+
+## 🚀 Quick Start (If You Can't Wait)
+
+```bash
+# On Ubuntu server
+git clone https://github.com/SatinderPahwa/camera-platform-local.git
+cd camera-platform-local
+
+# Run the setup wizard - it handles everything
+python3 setup_platform.py
+
+# Start platform
+./scripts/managed_start.sh start
+
+# Add camera
+python3 tools/add_camera.py YOUR_CAMERA_ID
+```
+
+**Note:** This assumes EMQX, Kurento, and TURN server are already installed. If not, start with [DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md).
+
+---
+
+## 📚 Documentation
+
+Choose your path:
+
+| Document | When to Use |
+|----------|-------------|
+| **[DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)** | **Start here for complete setup** |
+| [CAMERA_SETUP.md](docs/CAMERA_SETUP.md) | Adding cameras after platform is running |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Fixing issues |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Understanding how it works |
+
+---
+
+## 🎥 Supported Cameras
 
 - **Model:** VBC01 (Hive Camera)
 - **Firmware:** FW117 and compatible versions
-- **SDK:** AWS IoT SDK v2.1.1 (works with EMQX)
-- **Connection:** MQTT over TLS (mutual TLS)
+- **Connection:** MQTT over TLS (mutual authentication)
+- **Features:** Motion detection, person detection, encrypted recordings
 
-## Requirements
+**Have different cameras?** This platform is designed specifically for VBC01 cameras with AWS IoT SDK v2.1.1.
 
-### Server
-- 2GB RAM minimum (4GB recommended)
-- 20GB disk space
-- Static IP on local network
-- Domain name (for external access)
+---
 
-### Software
-- EMQX 5.8.8+
-- Python 3.8+
-- FFmpeg (for video processing)
-- Kurento Media Server (for livestreaming)
+## 💡 Key Differences from AWS IoT Version
 
-## Configuration
-
-All configuration is done via `.env` file (auto-generated by setup wizard):
-
-```bash
-# Network
-EMQX_BROKER_ENDPOINT=camera.pahwa.net
-CONFIG_SERVER_HOST=192.168.199.173
-
-# Telegram
-TELEGRAM_BOT_TOKEN=your_token
-TELEGRAM_CHAT_ID=your_chat_id
-
-# TURN Server (for remote access)
-TURN_SERVER_URL=turns:camera.pahwa.net:5349
-```
-
-## Adding a Camera
-
-```bash
-# 1. Run camera setup (copies certificates)
-python3 tools/add_camera.py
-
-# 2. FTP files to camera at /root/certs/
-cd camera_files/
-# Upload: mqttCA.crt, mqtt.pem, mqtt.key
-
-# 3. Reboot camera
-# Camera auto-connects to local EMQX broker
-```
-
-## Development
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run tests
-pytest tests/
-
-# Start individual services
-python3 servers/enhanced_config_server.py
-python3 servers/local_mqtt_processor.py
-python3 servers/dashboard_server.py
-```
-
-## Migration from AWS IoT
-
-If you have an existing AWS IoT-based deployment:
-
-1. Deploy this platform on new server
-2. Test with one camera
-3. Migrate cameras one by one
-4. Keep old server as backup
-
-See [MIGRATION_GUIDE.md](docs/MIGRATION_GUIDE.md) for details.
-
-## Differences from AWS IoT Version
-
-| Feature | AWS IoT Version | Local Version |
-|---------|----------------|---------------|
-| **MQTT Broker** | AWS IoT Core (cloud) | EMQX (local) |
+| Feature | AWS IoT Version | This Version |
+|---------|----------------|--------------|
+| **MQTT Broker** | AWS IoT Core (cloud) | EMQX (your server) |
 | **Internet** | Required | Optional |
-| **Setup** | AWS account + credentials | Domain + IP only |
-| **Certificates** | AWS IoT Things | Self-signed CA |
-| **Cost** | AWS charges | Free (self-hosted) |
-| **Notifications** | Slack + Telegram | Telegram only |
+| **Setup Time** | Hours (AWS setup) | Minutes (automated) |
+| **Monthly Cost** | AWS charges | $0 (self-hosted) |
+| **Data Privacy** | Stored in AWS | Stays on your server |
+| **Remote Access** | Always works | Requires TURN server |
 
-## Troubleshooting
+---
 
-### Camera won't connect
-- Check EMQX is running: `emqx ctl status`
-- Verify certificates on camera: checksums match
-- Check domain resolves to your server
+## 🛠️ Getting Help
 
-### No notifications
-- Verify Telegram token: `curl https://api.telegram.org/bot<TOKEN>/getMe`
-- Check processor logs: `tail -f logs/mqtt_processor.log`
+1. **Check the guides:**
+   - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md)
+   - [Troubleshooting](docs/TROUBLESHOOTING.md)
 
-### Dashboard not accessible
-- Check service: `./scripts/managed_start.sh status`
-- Verify port 5000 is open
-- Check logs: `tail -f logs/dashboard_server.log`
+2. **Check service status:**
+   ```bash
+   ./scripts/managed_status.sh
+   ```
 
-## Contributing
+3. **View logs:**
+   ```bash
+   tail -f logs/*.log
+   ```
 
-This is a personal project, but contributions welcome!
+4. **Open an issue:**
+   - GitHub Issues: https://github.com/SatinderPahwa/camera-platform-local/issues
 
-## License
+---
 
-MIT License - See LICENSE file
+## 🤝 Contributing
 
-## Credits
+This is a personal project, but contributions are welcome! If you've improved something or fixed a bug, pull requests are appreciated.
+
+---
+
+## 📄 License
+
+MIT License - See [LICENSE](LICENSE) file
+
+---
+
+## 🙏 Credits
 
 - Built for VBC01 Hive Cameras
-- EMQX Broker - https://www.emqx.io/
-- Kurento Media Server - https://www.kurento.org/
-
-## Support
-
-For issues, questions, or feature requests, please open an issue on GitHub.
+- Powered by [EMQX](https://www.emqx.io/)
+- Livestreaming via [Kurento](https://www.kurento.org/)
+- Notifications via [Telegram](https://telegram.org/)
 
 ---
 
 **Built with ❤️ for privacy-focused, offline-capable home security**
+
+**Questions?** Start with the [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) → It has everything you need.
