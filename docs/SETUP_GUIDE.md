@@ -13,32 +13,38 @@ Complete installation and configuration guide for the offline-capable camera man
 
 ## Prerequisites
 
+### Server Infrastructure Setup
+
+**Important:** For production Ubuntu server deployment with livestreaming support, follow [SERVER_SETUP.md](SERVER_SETUP.md) first to install:
+- EMQX 5.8.8 (MQTT broker)
+- Kurento Media Server 7.0.1 (WebRTC livestreaming)
+- coturn (TURN/STUN server - REQUIRED for remote access)
+- Nginx (reverse proxy)
+- SSL certificates (Let's Encrypt)
+
+This guide assumes you have completed the server infrastructure setup.
+
 ### System Requirements
 
 - **Operating System:** Linux (Ubuntu 22.04+ recommended) or macOS
-- **RAM:** 2GB minimum, 4GB recommended
-- **Disk Space:** 20GB minimum
+- **RAM:** 4GB minimum, 8GB recommended (for livestreaming)
+- **Disk Space:** 50GB minimum (SSD recommended)
 - **Network:** Static IP on local network
-- **Domain:** Domain name pointing to your server (for camera connections)
+- **Domain:** Domain name pointing to your server (REQUIRED)
 
-### Software Requirements
+### Software Requirements (if not using SERVER_SETUP.md)
 
 1. **Python 3.8 or higher**
    ```bash
    python3 --version
    ```
 
-2. **EMQX Broker 5.8.8+**
+2. **EMQX Broker 5.8.8+** (See [SERVER_SETUP.md](SERVER_SETUP.md) for full installation)
    ```bash
    # macOS
    brew install emqx
 
-   # Ubuntu/Debian
-   wget https://www.emqx.com/en/downloads/broker/5.8.8/emqx-5.8.8-ubuntu22.04-amd64.deb
-   sudo dpkg -i emqx-5.8.8-ubuntu22.04-amd64.deb
-
-   # Verify installation
-   emqx --version
+   # Ubuntu - see SERVER_SETUP.md for production setup
    ```
 
 3. **Git** (for cloning repository)
@@ -47,7 +53,7 @@ Complete installation and configuration guide for the offline-capable camera man
    brew install git      # macOS
    ```
 
-4. **(Optional) FFmpeg** - For video processing
+4. **FFmpeg** - For video processing
    ```bash
    sudo apt install ffmpeg  # Ubuntu/Debian
    brew install ffmpeg      # macOS
