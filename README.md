@@ -181,14 +181,15 @@ python3 tools/add_camera.py YOUR_CAMERA_ID
 
 ## 📚 Documentation
 
-Choose your path:
+**Clear and focused - no redundancy:**
 
-| Document | When to Use |
-|----------|-------------|
-| **[DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)** | **Start here for complete setup** |
-| [CAMERA_SETUP.md](docs/CAMERA_SETUP.md) | Adding cameras after platform is running |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Fixing issues |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Understanding how it works |
+| Document | Purpose | Who It's For |
+|----------|---------|--------------|
+| **[DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)** | **Complete setup from Ubuntu to working platform** | **Everyone - Start here** |
+| [CAMERA_SETUP.md](docs/CAMERA_SETUP.md) | Detailed camera configuration reference | When adding cameras |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Fix common issues | When something breaks |
+| [SERVER_REFERENCE.md](docs/SERVER_REFERENCE.md) | Advanced tuning, monitoring, backups, HA | Production deployments |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Technical deep dive into system design | Developers, advanced users |
 
 ---
 
