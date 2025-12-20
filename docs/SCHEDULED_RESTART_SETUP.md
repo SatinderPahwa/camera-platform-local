@@ -41,7 +41,13 @@ Proactive monitoring that checks all critical services every 12 minutes and rest
    - Runs `sudo emqx ctl status` to verify broker is actually running
    - Restarts ALL services if not listening or not running
 
-6. **CLOSE-WAIT Connection Leak** - Threshold: 5 connections
+6. **Nginx (HTTPS Proxy)** - Port listening + service status
+   - Tests port 443 (HTTPS)
+   - Checks `systemctl is-active nginx`
+   - Restarts ALL services if not listening or not running
+   - Critical for external HTTPS access to dashboard
+
+7. **CLOSE-WAIT Connection Leak** - Threshold: 5 connections
    - Monitors dashboard port 5000: `ss -tn | grep ":5000" | grep CLOSE-WAIT`
    - Monitors config server port 8443: `ss -tn | grep ":8443" | grep CLOSE-WAIT`
    - Restarts ALL services if leak detected on either port
