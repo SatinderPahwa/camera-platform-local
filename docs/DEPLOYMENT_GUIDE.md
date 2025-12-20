@@ -131,9 +131,17 @@ docker run -d \
 # Verify Kurento is running
 docker ps | grep kms-production
 
-# Test WebSocket endpoint
-curl -s http://localhost:8888 | head -5
+# Check Kurento logs (should show "Kurento Media Server started")
+docker logs kms-production 2>&1 | grep "Media Server started"
+
+# Verify WebSocket is responding (should show "426 Upgrade Required")
+curl -I http://localhost:8888 2>&1 | grep "426"
 ```
+
+**Expected output:**
+- Container status: `Up X minutes (healthy)`
+- Logs: `Kurento Media Server started`
+- WebSocket: `HTTP/1.1 426 Upgrade Required`
 
 **Kurento WebSocket URL:** `ws://localhost:8888/kurento`
 
