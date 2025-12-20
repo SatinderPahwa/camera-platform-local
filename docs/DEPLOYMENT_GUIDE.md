@@ -49,9 +49,11 @@ Before starting, have these ready:
 
 ### 5. Router Configuration
 If accessing from outside your home:
-- Port forward 443 (HTTPS) to your server
-- Port forward 3478/5349 (TURN) to your server
-- Port forward 49152-65535 (UDP) to your server for TURN relay
+- Port forward 80 (HTTP) - Temporary for SSL certificates, then Nginx redirect
+- Port forward 443 (HTTPS) - Web dashboard access via Nginx
+- Port forward 8443 (HTTPS) - Config server for cameras (optional, only if cameras outside network)
+- Port forward 3478/5349 (TURN) - TURN server
+- Port forward 49152-65535 (UDP) - TURN relay ports
 
 ---
 
@@ -388,9 +390,12 @@ sudo ufw enable
 # SSH (adjust port if changed)
 sudo ufw allow 22/tcp
 
-# HTTP/HTTPS
+# HTTP/HTTPS (web dashboard)
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
+
+# Config server (cameras get certificates)
+sudo ufw allow 8443/tcp
 
 # EMQX MQTT
 sudo ufw allow 8883/tcp
@@ -413,6 +418,16 @@ sudo ufw status verbose
 ---
 
 ## Part 2: Platform Setup
+
+**Port Architecture Overview:**
+- **Port 80:** Nginx (HTTP redirect to HTTPS)
+- **Port 443:** Nginx (HTTPS) → Dashboard (port 5000)
+- **Port 8443:** Config server (HTTPS, self-signed) - Cameras get certificates here
+- **Port 8883:** EMQX MQTT broker
+
+This separation allows Nginx to handle secure web access while the config server operates independently for camera certificate provisioning.
+
+---
 
 ### Step 2.1: Clone Repository
 
@@ -582,10 +597,11 @@ md5sum /root/certs/*
 # Backup database
 cp /cali/master_ctrl.db /cali/master_ctrl.db.backup
 
-# Update config server host
-sqlite3 /cali/master_ctrl.db "UPDATE app_info SET value='YOUR_SERVER_IP' WHERE key='configSrvHost';"
+# Update config server host and port
+# Format: IP:PORT (e.g., 192.168.1.100:8443)
+sqlite3 /cali/master_ctrl.db "UPDATE app_info SET value='YOUR_SERVER_IP:8443' WHERE key='configSrvHost';"
 
-# Verify
+# Verify (should show YOUR_SERVER_IP:8443)
 sqlite3 /cali/master_ctrl.db "SELECT * FROM app_info WHERE key='configSrvHost';"
 
 # Append CA certificate to trusted bundle (one-time)
