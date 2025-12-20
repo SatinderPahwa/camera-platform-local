@@ -28,7 +28,10 @@ def get_env(key: str, default=None, cast_type=str):
         return None
 
     if cast_type == bool:
-        return value.lower() in ('true', '1', 'yes', 'on')
+        # If value is already a bool (from default), return it directly
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() in ('true', '1', 'yes', 'on')
     elif cast_type == int:
         return int(value)
     elif cast_type == float:
