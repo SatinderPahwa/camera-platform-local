@@ -735,8 +735,64 @@ python3 tools/add_camera.py ANOTHER_CAMERA_ID
 
 3. **Set up automated backups:**
    ```bash
-   # See docs/SERVER_SETUP.md#backup-and-maintenance
+   # See docs/SERVER_REFERENCE.md for backup strategies
    ```
+
+### Production Hardening (IMPORTANT)
+
+For production deployments, set up health monitoring and auto-restart:
+
+```bash
+# 1. Enable user lingering (services persist without active session)
+loginctl enable-linger $(whoami)
+
+# 2. Verify lingering enabled
+loginctl show-user $(whoami) | grep Linger
+# Should show: Linger=yes
+
+# 3. Set up systemd service for auto-start on boot
+mkdir -p ~/.config/systemd/user
+sed "s|/home/satinder|$HOME|g" camera-platform.service > ~/.config/systemd/user/camera-platform.service
+systemctl --user daemon-reload
+systemctl --user enable camera-platform.service
+systemctl --user start camera-platform.service
+
+# 4. Verify service started
+systemctl --user status camera-platform.service
+
+# 5. Configure sudo for health checks (allows passwordless EMQX status checks)
+sudo visudo -f /etc/sudoers.d/camera-platform
+# Add this line (replace 'satinder' with your username):
+# satinder ALL=(ALL) NOPASSWD: /usr/bin/emqx
+
+# 6. Set up cron jobs for health monitoring and scheduled restarts
+crontab -e
+# Add these lines (adjust path to your home directory):
+```
+
+```cron
+# Health check every 12 minutes
+*/12 * * * * ~/camera-platform-local/tools/health_check_and_restart.sh
+
+# Scheduled restarts every 8 hours (8 AM, 4 PM, Midnight)
+0 8,16,0 * * * ~/camera-platform-local/cron_restart_wrapper.sh >> ~/camera-platform-local/logs/cron_restart.log 2>&1
+```
+
+```bash
+# 7. Test health check manually
+./tools/health_check_and_restart.sh
+
+# 8. Check logs
+tail -20 logs/health_check.log
+```
+
+**What this provides:**
+- ✅ Auto-start services on server boot (no manual intervention needed)
+- ✅ Health monitoring every 12 minutes (auto-restart if issues detected)
+- ✅ Scheduled restarts every 8 hours (prevents connection leaks)
+- ✅ Self-healing system (automatically recovers from failures)
+
+**See full documentation:** [docs/SCHEDULED_RESTART_SETUP.md](SCHEDULED_RESTART_SETUP.md)
 
 ### Monitor System
 

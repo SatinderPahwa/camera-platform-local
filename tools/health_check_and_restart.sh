@@ -6,13 +6,15 @@
 # Adapted from AWS IoT version for EMQX MQTT broker
 #
 
-PROJECT_DIR="/home/satinder/camera-platform-local"
+# Detect project directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 LOG_FILE="$PROJECT_DIR/logs/health_check.log"
 TIMEOUT_SECONDS=5
 MAX_CLOSE_WAIT=5
 
 # Service endpoints and ports
-CONFIG_SERVER_URL="https://192.168.199.218:8443/health"
+CONFIG_SERVER_URL="https://localhost:8443/health"
 DASHBOARD_SERVER_URL="http://localhost:5000"
 
 # Function to log with timestamp
