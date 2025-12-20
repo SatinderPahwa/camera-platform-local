@@ -259,11 +259,27 @@ We'll configure Nginx after getting SSL certificates.
 
 ### Step 1.6: Get SSL Certificates (Let's Encrypt)
 
+**IMPORTANT Prerequisites:**
+1. ✅ **DNS:** Your domain must resolve to your server's public IP
+   ```bash
+   nslookup YOUR_DOMAIN  # Should return your public IP
+   ```
+
+2. ✅ **Router Port Forwarding:** Forward port 80 from public IP to server
+   - **External:** Public IP, port 80
+   - **Internal:** Server's local IP (e.g., WiFi IP if using WiFi), port 80
+   - **Protocol:** TCP
+
+3. ✅ **Firewall:** Port 80 must be open (we'll configure UFW in Step 1.9)
+
+**Get Certificate:**
+
 ```bash
 # Install Certbot
 sudo apt install -y certbot python3-certbot-nginx
 
 # Get certificate (replace YOUR_DOMAIN)
+# Example: sudo certbot certonly --standalone -d cameras.example.com
 sudo certbot certonly --standalone -d YOUR_DOMAIN
 
 # Follow prompts:
@@ -274,6 +290,10 @@ sudo certbot certonly --standalone -d YOUR_DOMAIN
 # Verify certificate
 sudo certbot certificates
 ```
+
+**Troubleshooting:**
+- If certbot fails with "port 80 already in use" → Check nothing is running on port 80: `ss -tulpn | grep :80`
+- If certbot fails with "connection refused" → Verify router port forwarding is set up correctly
 
 **Certificates installed at:**
 - `/etc/letsencrypt/live/YOUR_DOMAIN/fullchain.pem`
