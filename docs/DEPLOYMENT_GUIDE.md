@@ -176,21 +176,37 @@ sudo nano /etc/default/coturn
 sudo nano /etc/turnserver.conf
 ```
 
-**Paste this configuration** (replace YOUR_DOMAIN and IPs):
+**Configuration Options:**
+
+**Option A: Copy from existing server** (RECOMMENDED if you have working production server)
+- Copy your existing `/etc/turnserver.conf` from production
+- Update only the IP addresses to match new server
+- This is safer as you keep all working settings
+
+**Option B: Use template below** (for fresh setups):
+
+**Paste this configuration** (replace placeholders with your values):
 
 ```ini
 # Realm and server identification
+# realm: Your domain name (used for authentication)
+# Example: realm=camera.example.com
 realm=YOUR_DOMAIN
+
+# server-name: Identifies this TURN server
+# Example: server-name=camera.example.com
 server-name=YOUR_DOMAIN
 
 # Listening configuration
 # IMPORTANT: Use your server's local IP, not 0.0.0.0 (more secure)
+# Example: listening-ip=192.168.1.100
 listening-ip=YOUR_LOCAL_IP
 listening-port=3478
 tls-listening-port=5349
 
 # External IP mapping for NAT (Public IP / Private IP)
-# Replace with your actual IPs
+# This tells TURN how to handle NAT traversal
+# Example: external-ip=203.0.113.45/192.168.1.100
 external-ip=YOUR_PUBLIC_IP/YOUR_LOCAL_IP
 
 # Relay port range (standard ephemeral ports)
@@ -199,9 +215,11 @@ max-port=65535
 
 # Authentication
 lt-cred-mech
+# Example: user=turnuser:MySecurePassword123
 user=turnuser:STRONG_PASSWORD_HERE
 
 # SSL certificates (will be added after Let's Encrypt setup)
+# Example: cert=/etc/letsencrypt/live/camera.example.com/fullchain.pem
 # cert=/etc/letsencrypt/live/YOUR_DOMAIN/fullchain.pem
 # pkey=/etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem
 
@@ -210,7 +228,7 @@ verbose
 log-file=/var/tmp/turn.log
 syslog
 
-# Security hardening
+# Security hardening (reduces DDoS amplification)
 fingerprint
 no-multicast-peers
 no-cli
@@ -218,6 +236,12 @@ no-rfc5780
 no-stun-backward-compatibility
 response-origin-only-with-rfc5780
 ```
+
+**What these settings mean:**
+- **realm/server-name:** Your domain (usually the same value)
+- **listening-ip:** Server's local network IP address
+- **external-ip:** Your public IP / your private IP (for NAT)
+- **user:** TURN credentials in format `username:password`
 
 **Don't start coturn yet** - we need SSL certificates first.
 
