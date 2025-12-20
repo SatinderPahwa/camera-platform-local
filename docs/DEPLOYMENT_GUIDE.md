@@ -97,30 +97,59 @@ emqx ctl status
 # Should show: EMQX 5.8.8 is running
 ```
 
-### Step 1.3: Install Kurento Media Server (7.0.1)
+### Step 1.3: Install Kurento Media Server (Docker)
+
+**Note:** We use Kurento 6.16.0 in a Docker container (proven stable, avoids libnice ICE bugs in 7.0+).
 
 ```bash
-# Add repository key
-sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 5AFA7A83
+# Install Docker
+sudo apt install -y docker.io
 
-# Add Kurento repository
-sudo tee /etc/apt/sources.list.d/kurento.list <<EOF
-deb [arch=amd64] http://ubuntu.openvidu.io/7.0.1 jammy kms7
-EOF
+# Enable and start Docker
+sudo systemctl enable docker
+sudo systemctl start docker
 
-# Install
-sudo apt update
-sudo apt install -y kurento-media-server=7.0.1
+# Add your user to docker group (avoids needing sudo)
+sudo usermod -aG docker $USER
 
-# Hold version
-sudo apt-mark hold kurento-media-server
+# Apply group changes (or logout/login)
+newgrp docker
 
-# Enable and start
-sudo systemctl enable kurento-media-server
-sudo systemctl start kurento-media-server
+# Pull Kurento image
+docker pull kurento/kurento-media-server:6.16.0
 
-# Verify
-sudo systemctl status kurento-media-server
+# Create Kurento container
+docker run -d \
+    --name kms-production \
+    --network host \
+    --restart unless-stopped \
+    -e KMS_MIN_PORT=5000 \
+    -e KMS_MAX_PORT=5050 \
+    -e GST_DEBUG=3,Kurento*:4 \
+    kurento/kurento-media-server:6.16.0
+
+# Verify Kurento is running
+docker ps | grep kms-production
+
+# Test WebSocket endpoint
+curl -s http://localhost:8888 | head -5
+```
+
+**Kurento WebSocket URL:** `ws://localhost:8888/kurento`
+
+**Useful commands:**
+```bash
+# View logs
+docker logs -f kms-production
+
+# Restart
+docker restart kms-production
+
+# Stop
+docker stop kms-production
+
+# Remove (if needed)
+docker stop kms-production && docker rm kms-production
 ```
 
 ### Step 1.4: Install TURN Server (coturn)
@@ -585,7 +614,7 @@ https://YOUR_DOMAIN
 **If stream doesn't work:**
 - Check TURN server: `sudo systemctl status coturn`
 - Test TURN: https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/
-- Check Kurento: `sudo systemctl status kurento-media-server`
+- Check Kurento: `docker ps | grep kms-production` and `docker logs kms-production`
 
 ---
 
@@ -668,7 +697,7 @@ python3 tools/test_emqx.py
 
 **No livestream:**
 - Check TURN server: `sudo systemctl status coturn`
-- Check Kurento: `sudo systemctl status kurento-media-server`
+- Check Kurento: `docker ps | grep kms-production` and `docker logs kms-production`
 - Test TURN: https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/
 
 **No notifications:**

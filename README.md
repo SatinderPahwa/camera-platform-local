@@ -150,7 +150,7 @@ Common issues:
 ### **What Gets Installed:**
 
 - **EMQX 5.8.8** - MQTT broker
-- **Kurento 7.0.1** - WebRTC media server
+- **Kurento 6.16.0** - WebRTC media server (Docker)
 - **coturn** - TURN/STUN server (REQUIRED for remote streaming)
 - **Nginx** - Reverse proxy
 - **Python 3.8+** - Platform runtime

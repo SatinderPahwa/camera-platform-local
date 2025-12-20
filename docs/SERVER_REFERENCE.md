@@ -95,11 +95,14 @@ mqtt {
 
 ### Kurento Performance
 
-```bash
-# Edit Kurento config
-sudo nano /etc/kurento/kurento.conf.json
+**Note:** Kurento runs in Docker container. Configuration changes require custom config files mounted as volumes.
 
-# Increase worker threads
+```bash
+# Create custom Kurento config directory
+mkdir -p ~/kurento-config
+
+# Create custom configuration
+cat > ~/kurento-config/kurento.conf.json <<EOF
 {
   "mediaServer": {
     "resources": {
@@ -115,9 +118,24 @@ sudo nano /etc/kurento/kurento.conf.json
     }
   }
 }
+EOF
 
-# Restart Kurento
-sudo systemctl restart kurento-media-server
+# Recreate container with custom config
+docker stop kms-production
+docker rm kms-production
+
+docker run -d \
+    --name kms-production \
+    --network host \
+    --restart unless-stopped \
+    -v ~/kurento-config/kurento.conf.json:/etc/kurento/kurento.conf.json:Z \
+    -e KMS_MIN_PORT=5000 \
+    -e KMS_MAX_PORT=5050 \
+    -e GST_DEBUG=3,Kurento*:4 \
+    kurento/kurento-media-server:6.16.0
+
+# View logs
+docker logs -f kms-production
 ```
 
 ### Nginx Optimization
@@ -238,8 +256,8 @@ tail -f ~/camera-platform-local/logs/*.log
 # Monitor EMQX
 sudo journalctl -u emqx -f
 
-# Monitor Kurento
-sudo journalctl -u kurento-media-server -f
+# Monitor Kurento (Docker)
+docker logs -f kms-production
 
 # Monitor coturn
 sudo tail -f /var/log/turnserver.log
@@ -271,16 +289,34 @@ if [ "$STATUS" != "active" ]; then
 fi
 ```
 
+**For Docker containers, create separate script:**
+
 ```bash
-# Make executable
+sudo nano /usr/local/bin/docker-alert.sh
+```
+
+```bash
+#!/bin/bash
+CONTAINER=$1
+STATUS=$(docker ps --filter "name=$CONTAINER" --filter "status=running" -q)
+
+if [ -z "$STATUS" ]; then
+    echo "Docker container $CONTAINER is not running on $(hostname)" | \
+    mail -s "ALERT: CONTAINER $CONTAINER DOWN" admin@example.com
+fi
+```
+
+```bash
+# Make both executable
 sudo chmod +x /usr/local/bin/service-alert.sh
+sudo chmod +x /usr/local/bin/docker-alert.sh
 
 # Add to cron (check every 5 minutes)
 crontab -e
 
 # Add:
 */5 * * * * /usr/local/bin/service-alert.sh emqx
-*/5 * * * * /usr/local/bin/service-alert.sh kurento-media-server
+*/5 * * * * /usr/local/bin/docker-alert.sh kms-production
 */5 * * * * /usr/local/bin/service-alert.sh coturn
 ```
 
@@ -322,8 +358,10 @@ cp ~/camera-platform-local/data/camera_events.db \
 # EMQX configuration
 sudo tar czf $BACKUP_DIR/emqx-config-$DATE.tar.gz /etc/emqx
 
-# Kurento configuration
-sudo tar czf $BACKUP_DIR/kurento-config-$DATE.tar.gz /etc/kurento
+# Kurento configuration (if using custom config)
+if [ -d ~/kurento-config ]; then
+    tar czf $BACKUP_DIR/kurento-config-$DATE.tar.gz ~/kurento-config
+fi
 
 # coturn configuration
 sudo cp /etc/turnserver.conf $BACKUP_DIR/turnserver-$DATE.conf
