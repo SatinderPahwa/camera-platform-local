@@ -48,12 +48,19 @@ Before starting, have these ready:
 - **Example:** `67E48798E70345179A86980A7CAAAE73`
 
 ### 5. Router Configuration
-If accessing from outside your home:
-- Port forward 80 (HTTP) - Temporary for SSL certificates, then Nginx redirect
-- Port forward 443 (HTTPS) - Web dashboard access via Nginx
-- Port forward 8443 (HTTPS) - Config server for cameras (optional, only if cameras outside network)
-- Port forward 3478/5349 (TURN) - TURN server
-- Port forward 49152-65535 (UDP) - TURN relay ports
+
+**Required port forwarding (for remote access):**
+- Port 80 (TCP) - Temporary for SSL certificate validation
+- Port 443 (TCP) - HTTPS web dashboard access
+- Port 3478 (TCP/UDP) - TURN server
+- Port 5349 (TCP/UDP) - TURN server (TLS)
+- Port 49152-65535 (UDP) - TURN relay ports
+
+**NOT needed (local network only):**
+- Port 8443 - Config server (cameras connect locally)
+- Port 8883 - EMQX MQTT (cameras connect locally)
+
+**Note:** Port 8443 forwarding is only needed if cameras are located outside your local network.
 
 ---
 
