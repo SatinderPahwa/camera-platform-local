@@ -448,6 +448,9 @@ cd camera-platform-local
 ### Step 2.2: Install Python Dependencies
 
 ```bash
+# Install Python virtual environment package
+sudo apt install -y python3-venv
+
 # Create virtual environment
 python3 -m venv venv
 
