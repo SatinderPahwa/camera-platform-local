@@ -42,7 +42,7 @@ check_status() {
 # Check EMQX
 printf "%-20s" "EMQX broker:"
 if command -v emqx &> /dev/null; then
-    if emqx ctl status &> /dev/null; then
+    if sudo emqx ctl status &> /dev/null; then
         echo -e "${GREEN}Running${NC}"
     else
         echo -e "${RED}Not running${NC}"
@@ -70,8 +70,8 @@ echo "  tail -f logs/mqtt_processor.log"
 echo "  tail -f logs/dashboard_server.log"
 echo ""
 echo "EMQX management:"
-echo "  sudo emqx start"
-echo "  sudo emqx stop"
-echo "  emqx ctl status"
+echo "  sudo systemctl start emqx"
+echo "  sudo systemctl stop emqx"
+echo "  sudo emqx ctl status"
 echo "  Dashboard: http://localhost:18083 (admin/public)"
 echo ""

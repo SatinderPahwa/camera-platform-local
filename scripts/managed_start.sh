@@ -122,12 +122,12 @@ check_emqx() {
     echo -e "${BLUE}Checking EMQX broker...${NC}"
 
     if command -v emqx &> /dev/null; then
-        if emqx ctl status &> /dev/null; then
+        if sudo emqx ctl status &> /dev/null; then
             echo -e "${GREEN}✓ EMQX broker is running${NC}"
             return 0
         else
             echo -e "${RED}✗ EMQX broker is not running${NC}"
-            echo -e "${YELLOW}  Start EMQX: sudo emqx start${NC}"
+            echo -e "${YELLOW}  Start EMQX: sudo systemctl start emqx${NC}"
             return 1
         fi
     else
