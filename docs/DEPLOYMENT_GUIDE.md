@@ -51,7 +51,7 @@ Before starting, have these ready:
 If accessing from outside your home:
 - Port forward 443 (HTTPS) to your server
 - Port forward 3478/5349 (TURN) to your server
-- Port forward 50000-60000 (UDP) to your server
+- Port forward 49152-65535 (UDP) to your server for TURN relay
 
 ---
 
@@ -179,32 +179,44 @@ sudo nano /etc/turnserver.conf
 **Paste this configuration** (replace YOUR_DOMAIN and IPs):
 
 ```ini
+# Realm and server identification
 realm=YOUR_DOMAIN
 server-name=YOUR_DOMAIN
 
-listening-ip=0.0.0.0
+# Listening configuration
+# IMPORTANT: Use your server's local IP, not 0.0.0.0 (more secure)
+listening-ip=YOUR_LOCAL_IP
 listening-port=3478
 tls-listening-port=5349
 
+# External IP mapping for NAT (Public IP / Private IP)
 # Replace with your actual IPs
 external-ip=YOUR_PUBLIC_IP/YOUR_LOCAL_IP
-relay-ip=YOUR_LOCAL_IP
 
-min-port=50000
-max-port=60000
+# Relay port range (standard ephemeral ports)
+min-port=49152
+max-port=65535
 
+# Authentication
 lt-cred-mech
 user=turnuser:STRONG_PASSWORD_HERE
 
-# We'll add cert paths after Let's Encrypt
+# SSL certificates (will be added after Let's Encrypt setup)
 # cert=/etc/letsencrypt/live/YOUR_DOMAIN/fullchain.pem
 # pkey=/etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem
 
+# Logging
 verbose
-log-file=/var/log/turnserver.log
+log-file=/var/tmp/turn.log
+syslog
+
+# Security hardening
 fingerprint
 no-multicast-peers
 no-cli
+no-rfc5780
+no-stun-backward-compatibility
+response-origin-only-with-rfc5780
 ```
 
 **Don't start coturn yet** - we need SSL certificates first.
@@ -345,8 +357,8 @@ sudo ufw allow 3478/udp
 sudo ufw allow 5349/tcp
 sudo ufw allow 5349/udp
 
-# TURN relay ports
-sudo ufw allow 50000:60000/udp
+# TURN relay ports (ephemeral port range)
+sudo ufw allow 49152:65535/udp
 
 # Check status
 sudo ufw status verbose
