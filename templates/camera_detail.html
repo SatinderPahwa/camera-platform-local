@@ -1,0 +1,498 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                <li class="breadcrumb-item active">{{ camera.name or "Camera Details" }}</li>
+            </ol>
+        </nav>
+        <h1><i class="fas fa-video me-2"></i>{{ camera.name or "Camera Details" }}</h1>
+    </div>
+</div>
+
+<!-- Camera Info -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body py-2">
+                <div class="row small">
+                    <div class="col-md-3">
+                        <strong>Status:</strong>
+                        <span class="badge bg-{% if camera.status == 'active' %}success{% elif camera.status == 'online' %}info{% elif camera.status == 'unknown' %}secondary{% else %}danger{% endif %}">
+                            {{ camera.status|title }}
+                        </span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>IP:</strong> <code>{{ camera.ip or 'Unknown' }}</code>
+                    </div>
+                    <div class="col-md-2">
+                        <strong>Firmware:</strong> {{ camera.firmware or 'Unknown' }}
+                    </div>
+                    <div class="col-md-2">
+                        <strong>Events (24h):</strong> {{ camera.activity_24h or 0 }}
+                    </div>
+                    <div class="col-md-2">
+                        <strong>Last Seen:</strong> {{ camera.last_seen or 'Never' }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Camera Settings -->
+<div class="row mb-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-cog me-2"></i>Camera Settings</h5>
+            </div>
+            <div class="card-body">
+                <!-- Camera Name -->
+                <div class="row mb-4 pb-3 border-bottom">
+                    <div class="col-md-12">
+                        <h6 class="mb-2"><i class="fas fa-tag me-2"></i>Camera Name</h6>
+                        <div class="input-group mb-2">
+                            <input type="text" class="form-control" id="cameraName" value="{{ camera.name }}" placeholder="Enter camera name">
+                            <button class="btn btn-primary" onclick="renameCamera()">
+                                <i class="fas fa-save"></i> Save Name
+                            </button>
+                        </div>
+                        <small class="text-muted">Give your camera a friendly name for easy identification</small>
+                    </div>
+                </div>
+
+                <!-- Mode Control -->
+                <div class="row mb-4 pb-3 border-bottom">
+                    <div class="col-md-8">
+                        <h6 class="mb-2"><i class="fas fa-shield-alt me-2"></i>Mode Control</h6>
+                        <div class="btn-group mb-2" role="group">
+                            <button class="btn btn-outline-success" onclick="setCameraMode('ARMED')">
+                                <i class="fas fa-shield-alt"></i> ARM
+                            </button>
+                            <button class="btn btn-outline-warning" onclick="setCameraMode('LIVESTREAMONLY')">
+                                <i class="fas fa-video"></i> LIVESTREAM ONLY
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="setCameraMode('PRIVACY')">
+                                <i class="fas fa-eye-slash"></i> PRIVACY
+                            </button>
+                        </div>
+                        <div>
+                            <small class="text-muted">Control camera motion detection and recording</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="mb-2"><i class="fas fa-power-off me-2"></i>System Control</h6>
+                        <button class="btn btn-outline-danger mb-2" onclick="rebootCamera()">
+                            <i class="fas fa-power-off"></i> REBOOT
+                        </button>
+                        <div>
+                            <small class="text-muted">Restart camera system</small>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="settingsForm">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="resolution" class="form-label">Resolution</label>
+                                <select class="form-select" id="resolution" name="resolution">
+                                    <option value="R_1080P">1080P (Full HD)</option>
+                                    <option value="R_720P">720P (HD)</option>
+                                    <option value="R_480P">480P (SD)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="frameRate" class="form-label">Frame Rate</label>
+                                <select class="form-select" id="frameRate" name="frameRate">
+                                    <option value="_30FPS">30 FPS</option>
+                                    <option value="_15FPS">15 FPS</option>
+                                    <option value="_10FPS">10 FPS</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="motionDetection" class="form-label">Motion Detection</label>
+                                <select class="form-select" id="motionDetection" name="motionDetection">
+                                    <option value="SMART">Smart Detection</option>
+                                    <option value="ALL">All Motion</option>
+                                    <option value="OFF">Disabled</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="audioDetection" class="form-label">Audio Detection</label>
+                                <select class="form-select" id="audioDetection" name="audioDetection">
+                                    <option value="SMART">Smart Detection</option>
+                                    <option value="ALL">All Audio</option>
+                                    <option value="OFF">Disabled</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="nightVision" class="form-label">Night Vision</label>
+                                <select class="form-select" id="nightVision" name="nightVision">
+                                    <option value="AUTO">Auto</option>
+                                    <option value="ON">Always On</option>
+                                    <option value="OFF">Always Off</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="cameraAudio" class="form-label">Camera Audio</label>
+                                <select class="form-select" id="cameraAudio" name="cameraAudio">
+                                    <option value="true">Enabled</option>
+                                    <option value="false">Disabled</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="invertImage" class="form-label">Invert Image</label>
+                                <select class="form-select" id="invertImage" name="invertImage">
+                                    <option value="false">Normal</option>
+                                    <option value="true">Inverted</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="ledDot" class="form-label">Status LED (Dot)</label>
+                                <select class="form-select" id="ledDot" name="ledDot">
+                                    <option value="true">Enabled</option>
+                                    <option value="false">Disabled</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="ledRing" class="form-label">Ring LED</label>
+                                <select class="form-select" id="ledRing" name="ledRing">
+                                    <option value="true">Enabled</option>
+                                    <option value="false">Disabled</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="soundAlert" class="form-label">Sound Alert</label>
+                                <select class="form-select" id="soundAlert" name="soundAlert">
+                                    <option value="true">Enabled</option>
+                                    <option value="false">Disabled</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <button type="button" class="btn btn-primary" onclick="applySettings()">
+                            <i class="fas fa-save"></i> Apply Settings
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="resetSettings()">
+                            <i class="fas fa-undo"></i> Reset to Defaults
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity History -->
+<div class="row">
+    <div class="col">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-history me-2"></i>Activity History</h5>
+                <span class="badge bg-info">{{ events|length }} events</span>
+            </div>
+            <div class="card-body">
+                {% if events %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Time</th>
+                                <th>Activity</th>
+                                <th>Duration</th>
+                                <th>Confidence</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in events %}
+                            <tr>
+                                <td>
+                                    <div>{{ event.start_time }}</div>
+                                    {% if event.end_time %}
+                                    <small class="text-muted">{{ event.end_time }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if event.activity_type == 'MOTION' %}danger{% else %}info{% endif %}">
+                                        {{ event.activity_type }}
+                                    </span>
+                                </td>
+                                <td>{{ event.duration_str }}</td>
+                                <td>
+                                    {% if event.confidence %}
+                                    {{ "%.0f"|format(event.confidence * 100) }}%
+                                    {% else %}
+                                    N/A
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if event.upload_status == 'completed' %}success{% elif event.upload_status == 'pending' %}warning{% else %}secondary{% endif %}">
+                                        {{ event.upload_status|title }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-inbox fa-3x mb-3"></i>
+                    <p>No activity recorded for this camera</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    console.log('🔵 Camera detail page scripts loaded');
+
+    function setCameraMode(mode) {
+        const cameraId = '{{ camera.id }}';
+
+        // Show loading state
+        const buttons = document.querySelectorAll('.btn-group button');
+        buttons.forEach(btn => btn.disabled = true);
+
+        fetch('/api/control/mode/' + cameraId + '/' + mode, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Camera mode set to ' + mode);
+                location.reload(); // Refresh to show updated status
+            } else {
+                alert('Failed to set camera mode: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('Failed to set camera mode: ' + error.message);
+            console.error('Camera control error:', error);
+        })
+        .finally(() => {
+            // Re-enable buttons
+            buttons.forEach(btn => btn.disabled = false);
+        });
+    }
+
+    function rebootCamera() {
+        const cameraId = '{{ camera.id }}';
+
+        if (!confirm('Are you sure you want to reboot this camera? It will be offline for about 1-2 minutes.')) {
+            return;
+        }
+
+        const rebootBtn = document.querySelector('[onclick="rebootCamera()"]');
+        rebootBtn.disabled = true;
+        rebootBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> REBOOTING...';
+
+        fetch('/api/control/reboot/' + cameraId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Reboot command sent to camera. Camera will restart in a few seconds.');
+            } else {
+                alert('Failed to reboot camera: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('Failed to reboot camera: ' + error.message);
+            console.error('Reboot error:', error);
+        })
+        .finally(() => {
+            // Re-enable button after delay
+            setTimeout(() => {
+                rebootBtn.disabled = false;
+                rebootBtn.innerHTML = '<i class="fas fa-power-off"></i> REBOOT';
+            }, 5000);
+        });
+    }
+
+    function renameCamera() {
+        const cameraId = '{{ camera.id }}';
+        const nameInput = document.getElementById('cameraName');
+        const newName = nameInput.value.trim();
+
+        if (!newName) {
+            alert('Camera name cannot be empty');
+            return;
+        }
+
+        const btn = document.querySelector('[onclick="renameCamera()"]');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+        fetch('/api/control/rename/' + cameraId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: newName })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Camera renamed successfully!');
+                // Reload page to update camera name in header
+                location.reload();
+            } else {
+                alert('Failed to rename camera: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('Failed to rename camera: ' + error.message);
+            console.error('Rename error:', error);
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> Save Name';
+        });
+    }
+
+    function applySettings() {
+        const cameraId = '{{ camera.id }}';
+        const form = document.getElementById('settingsForm');
+        const formData = new FormData(form);
+
+        // Convert form data to object
+        const settings = {};
+        for (let [key, value] of formData.entries()) {
+            settings[key] = value;
+        }
+
+        const applyBtn = document.querySelector('[onclick="applySettings()"]');
+        applyBtn.disabled = true;
+        applyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Applying...';
+
+        fetch('/api/control/settings/' + cameraId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Camera settings applied successfully!');
+            } else {
+                alert('Failed to apply settings: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            alert('Failed to apply settings: ' + error.message);
+            console.error('Settings error:', error);
+        })
+        .finally(() => {
+            applyBtn.disabled = false;
+            applyBtn.innerHTML = '<i class="fas fa-save"></i> Apply Settings';
+        });
+    }
+
+    function loadSavedSettings() {
+        const cameraId = '{{ camera.id }}';
+
+        // Load settings from database
+        fetch('/api/control/settings/' + cameraId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.settings) {
+                    const settings = data.settings;
+
+                    // Populate form fields with saved settings
+                    if (settings.resolution) document.getElementById('resolution').value = settings.resolution;
+                    if (settings.frameRate) document.getElementById('frameRate').value = settings.frameRate;
+                    if (settings.motionDetection) document.getElementById('motionDetection').value = settings.motionDetection;
+                    if (settings.audioDetection) document.getElementById('audioDetection').value = settings.audioDetection;
+                    if (settings.nightVision) document.getElementById('nightVision').value = settings.nightVision;
+
+                    // For boolean fields, convert to string for dropdown selection
+                    if (settings.cameraAudio !== undefined) {
+                        document.getElementById('cameraAudio').value = String(settings.cameraAudio);
+                    }
+                    if (settings.invertImage !== undefined) {
+                        document.getElementById('invertImage').value = String(settings.invertImage);
+                    }
+                    if (settings.ledDot !== undefined) {
+                        document.getElementById('ledDot').value = String(settings.ledDot);
+                        console.log('Set ledDot to:', String(settings.ledDot));
+                    }
+                    if (settings.ledRing !== undefined) {
+                        document.getElementById('ledRing').value = String(settings.ledRing);
+                    }
+                    if (settings.soundAlert !== undefined) {
+                        document.getElementById('soundAlert').value = String(settings.soundAlert);
+                    }
+
+                    console.log('✅ Loaded', data.settings_count, 'saved settings from database:', settings);
+
+                    // Show notification that settings were loaded
+                    console.log('%c🎉 Settings loaded successfully!', 'color: green; font-weight: bold; font-size: 14px');
+                    console.log('LED Dot:', document.getElementById('ledDot').value);
+                    console.log('Camera Audio:', document.getElementById('cameraAudio').value);
+                } else {
+                    console.log('No saved settings found, using defaults');
+                }
+            })
+            .catch(error => {
+                console.error('❌ Failed to load saved settings:', error);
+            });
+    }
+
+    function resetSettings() {
+        // Reset form to default values
+        document.getElementById('resolution').value = 'R_1080P';
+        document.getElementById('frameRate').value = '_30FPS';
+        document.getElementById('motionDetection').value = 'SMART';
+        document.getElementById('nightVision').value = 'AUTO';
+        document.getElementById('cameraAudio').value = 'false';
+        document.getElementById('invertImage').value = 'false';
+        document.getElementById('ledDot').value = 'true';
+        document.getElementById('ledRing').value = 'true';
+        document.getElementById('soundAlert').value = 'true';
+
+        alert('Settings reset to defaults. Click "Apply Settings" to save.');
+    }
+
+    // Load saved settings when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSavedSettings();
+    });
+</script>
+{% endblock %}

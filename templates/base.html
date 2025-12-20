@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title or "Camera System" }}</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+
+    <!-- Theme Colors -->
+    <meta name="theme-color" content="#667eea">
+    <meta name="msapplication-TileColor" content="#667eea">
+
+    <!-- iOS Specific Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Cameras">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .camera-card {
+            transition: all 0.2s;
+            border: 1px solid #d0d0d0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .camera-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+            border-color: #007bff;
+        }
+        .camera-card .card-header {
+            padding: 0.75rem 1rem;
+            background-color: #f8f9fa !important;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .camera-card .card-body {
+            padding: 0.75rem 1rem;
+        }
+        .camera-card h5 {
+            font-size: 1rem;
+        }
+        .status-badge {
+            font-size: 0.8em;
+        }
+        @media (max-width: 768px) {
+            .camera-card {
+                border: 2px solid #c0c0c0;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+                margin-bottom: 1rem;
+            }
+            .camera-card h5 {
+                font-size: 0.95rem;
+            }
+            .camera-card .card-body {
+                padding: 0.5rem 0.75rem;
+            }
+            .camera-card .card-header {
+                padding: 0.5rem 0.75rem;
+                border-bottom: 2px solid #d0d0d0;
+            }
+            .camera-card .btn-sm {
+                padding: 0.25rem 0.5rem;
+                font-size: 0.825rem;
+            }
+        }
+        .activity-item {
+            border-left: 3px solid #dee2e6;
+            padding-left: 15px;
+        }
+        .activity-item.motion {
+            border-left-color: #dc3545;
+        }
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .rtsp-link {
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-video me-2"></i>Camera System
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-home me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('events_page') }}">
+                            <i class="fas fa-list me-1"></i>Events
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_page') }}">
+                            <i class="fas fa-tools me-1"></i>Admin
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-3 mt-5">
+        <div class="container text-center">
+            <small>Camera Management System - Hybrid AWS IoT + Local Processing</small>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Auto-refresh data every 30 seconds
+        function refreshData() {
+            if (typeof updateDashboard === 'function') {
+                updateDashboard();
+            }
+        }
+
+        // Set up auto-refresh
+        setInterval(refreshData, 30000);
+
+        // Register Service Worker for PWA support
+        // Service worker is served from root (/) to get proper scope for entire app
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+                    .then(registration => {
+                        console.log('PWA Service Worker registered with scope:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('PWA Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

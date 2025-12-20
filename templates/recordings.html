@@ -1,0 +1,470 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="fas fa-film me-2"></i>{{ camera.name }} - Recordings</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('camera_detail', camera_id=camera.id) }}">{{ camera.name }}</a></li>
+                <li class="breadcrumb-item active">Recordings</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<!-- Camera Info Card -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-3">
+                        <h5 class="mb-0">{{ camera.name }}</h5>
+                        <small class="text-muted">{{ camera.id }}</small>
+                    </div>
+                    <div class="col-md-3">
+                        <span class="badge bg-{{ 'success' if camera.connection_status == 'connected' else 'danger' }}">
+                            {{ camera.connection_status_str }}
+                        </span>
+                    </div>
+                    <div class="col-md-3">
+                        <small class="text-muted">Total Recordings:</small>
+                        <strong id="recording-count">Loading...</strong>
+                    </div>
+                    <div class="col-md-3 text-end">
+                        <a href="{{ url_for('camera_detail', camera_id=camera.id) }}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-arrow-left me-1"></i>Back to Camera
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Controls -->
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="btn-group" role="group">
+            <input type="radio" class="btn-check" name="filter-type" id="filter-all" value="all" checked>
+            <label class="btn btn-outline-primary" for="filter-all">All</label>
+
+            <input type="radio" class="btn-check" name="filter-type" id="filter-motion" value="MOTION">
+            <label class="btn btn-outline-primary" for="filter-motion">Motion</label>
+
+            <input type="radio" class="btn-check" name="filter-type" id="filter-person" value="PERSON">
+            <label class="btn btn-outline-primary" for="filter-person">Person</label>
+
+            <input type="radio" class="btn-check" name="filter-type" id="filter-sound" value="SOUND">
+            <label class="btn btn-outline-primary" for="filter-sound">Sound</label>
+        </div>
+    </div>
+    <div class="col-md-6 text-end">
+        <div class="input-group" style="max-width: 300px; margin-left: auto;">
+            <input type="date" class="form-control" id="filter-date" placeholder="Filter by date">
+            <button class="btn btn-outline-secondary" type="button" id="clear-date">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Indicator -->
+<div id="loading" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading recordings...</span>
+    </div>
+    <p class="mt-2 text-muted">Loading recordings...</p>
+</div>
+
+<!-- Recordings Grid -->
+<div id="recordings-grid" class="row g-4" style="display: none;">
+    <!-- Recordings will be dynamically inserted here -->
+</div>
+
+<!-- No Recordings Message -->
+<div id="no-recordings" class="alert alert-info" style="display: none;">
+    <i class="fas fa-info-circle me-2"></i>No recordings found for this camera.
+</div>
+
+<!-- Video Player Modal -->
+<div class="modal fade" id="videoPlayerModal" tabindex="-1" aria-labelledby="videoPlayerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="videoPlayerModalLabel">Recording Playback</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="video-player-container">
+                    <!-- Video player will be inserted here -->
+                </div>
+                <div id="recording-info" class="mt-3">
+                    <!-- Recording details will be displayed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="download-recording">
+                    <i class="fas fa-download me-1"></i>Download
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<!-- Video.js for HLS playback -->
+<link href="https://vjs.zencdn.net/8.6.1/video-js.css" rel="stylesheet">
+<script src="https://vjs.zencdn.net/8.6.1/video.min.js"></script>
+
+<script>
+const CAMERA_ID = "{{ camera.id }}";
+let allRecordings = [];
+let currentRecording = null;
+let player = null;
+
+// Fetch recordings from API
+async function loadRecordings() {
+    try {
+        const response = await fetch(`/api/recordings/${CAMERA_ID}`);
+        const data = await response.json();
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        allRecordings = data.recordings;
+
+        document.getElementById('recording-count').textContent = data.total_count;
+
+        if (data.total_count === 0) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('no-recordings').style.display = 'block';
+        } else {
+            renderRecordings(allRecordings);
+        }
+    } catch (error) {
+        console.error('Failed to load recordings:', error);
+        document.getElementById('loading').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Failed to load recordings: ${error.message}
+            </div>
+        `;
+    }
+}
+
+// Render recordings grid
+function renderRecordings(recordings) {
+    const grid = document.getElementById('recordings-grid');
+
+    if (recordings.length === 0) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('no-recordings').style.display = 'block';
+        grid.style.display = 'none';
+        return;
+    }
+
+    grid.innerHTML = recordings.map(recording => createRecordingCard(recording)).join('');
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('no-recordings').style.display = 'none';
+    grid.style.display = 'flex';
+}
+
+// Create recording card HTML
+function createRecordingCard(recording) {
+    const activityType = getActivityTypeDisplay(recording.activity_type);
+    const thumbnailUrl = getThumbnailUrl(recording);
+
+    return `
+        <div class="col-md-4 col-lg-3">
+            <div class="card recording-card h-100">
+                <div class="position-relative">
+                    ${thumbnailUrl ? `
+                        <img src="${thumbnailUrl}" class="card-img-top" alt="Thumbnail"
+                             style="height: 200px; object-fit: cover; cursor: pointer;"
+                             onclick="playRecording('${recording.event_id}')">
+                    ` : `
+                        <div class="bg-secondary text-white d-flex align-items-center justify-content-center"
+                             style="height: 200px; cursor: pointer;"
+                             onclick="playRecording('${recording.event_id}')">
+                            <i class="fas fa-video fa-3x opacity-50"></i>
+                        </div>
+                    `}
+                    <div class="position-absolute top-0 end-0 m-2">
+                        <span class="badge bg-dark bg-opacity-75">
+                            ${recording.duration_seconds}s
+                        </span>
+                    </div>
+                    <div class="position-absolute bottom-0 start-0 m-2">
+                        <span class="badge ${activityType.badgeClass}">
+                            ${activityType.icon} ${activityType.label}
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <h6 class="card-title mb-1">${recording.date}</h6>
+                    <p class="card-text text-muted mb-2">
+                        <i class="fas fa-clock me-1"></i>${recording.time}
+                    </p>
+                    <div class="btn-group w-100" role="group">
+                        <button class="btn btn-sm btn-primary" onclick="playRecording('${recording.event_id}')">
+                            <i class="fas fa-play me-1"></i>Play
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="downloadRecording('${recording.event_id}')">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Get activity type display properties
+function getActivityTypeDisplay(activityType) {
+    const types = {
+        'MOTION_SMART': { label: 'Person', icon: '<i class="fas fa-user"></i>', badgeClass: 'bg-danger' },
+        'MOTION_ALL': { label: 'Motion', icon: '<i class="fas fa-running"></i>', badgeClass: 'bg-warning' },
+        'PERSON': { label: 'Person', icon: '<i class="fas fa-user"></i>', badgeClass: 'bg-danger' },
+        'SOUND': { label: 'Sound', icon: '<i class="fas fa-volume-up"></i>', badgeClass: 'bg-info' },
+        'AUDIO_ALL': { label: 'Sound', icon: '<i class="fas fa-volume-up"></i>', badgeClass: 'bg-info' }
+    };
+
+    return types[activityType] || { label: activityType, icon: '<i class="fas fa-circle"></i>', badgeClass: 'bg-secondary' };
+}
+
+// Get thumbnail URL (placeholder for now)
+function getThumbnailUrl(recording) {
+    // TODO: Implement thumbnail serving endpoint
+    return recording.thumbnail_path ? `/api/media/thumbnail/${recording.event_id}` : null;
+}
+
+// Play recording in modal
+function playRecording(eventId) {
+    currentRecording = allRecordings.find(r => r.event_id === eventId);
+
+    if (!currentRecording) {
+        alert('Recording not found');
+        return;
+    }
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('videoPlayerModal'));
+    modal.show();
+
+    // Initialize video player with HLS
+    const playerContainer = document.getElementById('video-player-container');
+    playerContainer.innerHTML = `
+        <video id="recording-player" class="video-js vjs-default-skin vjs-big-play-centered" controls preload="auto"
+               style="width: 100%;">
+            <p class="vjs-no-js">
+                To view this video please enable JavaScript, and consider upgrading to a web browser that
+                <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+            </p>
+        </video>
+    `;
+
+    // Initialize Video.js player with responsive sizing
+    // Safari-friendly configuration: use native HLS playback
+    player = videojs('recording-player', {
+        controls: true,
+        autoplay: false,
+        preload: 'auto',
+        fluid: true,
+        responsive: true,
+        aspectRatio: '16:9',  // Default aspect ratio, will adjust to actual video
+        html5: {
+            nativeVideoTracks: true,
+            nativeAudioTracks: true,
+            nativeTextTracks: true,
+            hls: {
+                overrideNative: false  // Use Safari's native HLS player
+            }
+        }
+    });
+
+    // Load HLS playlist
+    const playlistUrl = `/api/media/playlist/${eventId}.m3u8`;
+    player.src({
+        src: playlistUrl,
+        type: 'application/x-mpegURL'
+    });
+
+    // Handle player errors
+    player.on('error', function() {
+        const error = player.error();
+        console.error('Video player error:', error);
+
+        playerContainer.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Playback Error</strong><br>
+                ${error ? error.message : 'Failed to load video'}<br>
+                <small>Event ID: ${eventId}</small>
+            </div>
+        `;
+    });
+
+    // Display recording info
+    const infoContainer = document.getElementById('recording-info');
+    const activityType = getActivityTypeDisplay(currentRecording.activity_type);
+    infoContainer.innerHTML = `
+        <h6>Recording Details</h6>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Event ID</dt>
+            <dd class="col-sm-9"><code>${currentRecording.event_id}</code></dd>
+
+            <dt class="col-sm-3">Date & Time</dt>
+            <dd class="col-sm-9">${currentRecording.date} ${currentRecording.time}</dd>
+
+            <dt class="col-sm-3">Type</dt>
+            <dd class="col-sm-9">
+                <span class="badge ${activityType.badgeClass}">
+                    ${activityType.icon} ${activityType.label}
+                </span>
+            </dd>
+
+            <dt class="col-sm-3">Duration</dt>
+            <dd class="col-sm-9">${currentRecording.duration_seconds}s</dd>
+
+            <dt class="col-sm-3">File</dt>
+            <dd class="col-sm-9"><small class="font-monospace">${currentRecording.recording_filename || 'N/A'}</small></dd>
+
+            <dt class="col-sm-3">Status</dt>
+            <dd class="col-sm-9">
+                <span class="badge bg-${currentRecording.upload_status === 'completed' ? 'success' : 'warning'}">
+                    ${currentRecording.upload_status}
+                </span>
+            </dd>
+        </dl>
+    `;
+}
+
+// Download recording as MP4
+function downloadRecording(eventId) {
+    const recording = allRecordings.find(r => r.event_id === eventId);
+
+    if (!recording || !recording.recording_path) {
+        alert('Recording file not available');
+        return;
+    }
+
+    // Show loading state
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Converting...';
+
+    // Trigger download
+    window.location.href = `/api/media/download/${eventId}`;
+
+    // Reset button after a delay (download started)
+    setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }, 3000);
+}
+
+// Filter recordings
+function filterRecordings() {
+    const typeFilter = document.querySelector('input[name="filter-type"]:checked').value;
+    const dateFilter = document.getElementById('filter-date').value;
+
+    let filtered = allRecordings;
+
+    // Filter by type
+    if (typeFilter !== 'all') {
+        filtered = filtered.filter(r => r.activity_type.includes(typeFilter));
+    }
+
+    // Filter by date
+    if (dateFilter) {
+        filtered = filtered.filter(r => r.date === dateFilter);
+    }
+
+    renderRecordings(filtered);
+}
+
+// Set up event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Load recordings on page load
+    loadRecordings();
+
+    // Filter controls
+    document.querySelectorAll('input[name="filter-type"]').forEach(input => {
+        input.addEventListener('change', filterRecordings);
+    });
+
+    document.getElementById('filter-date').addEventListener('change', filterRecordings);
+
+    document.getElementById('clear-date').addEventListener('click', function() {
+        document.getElementById('filter-date').value = '';
+        filterRecordings();
+    });
+
+    // Download button in modal
+    document.getElementById('download-recording').addEventListener('click', function() {
+        if (currentRecording) {
+            downloadRecording(currentRecording.event_id);
+        }
+    });
+
+    // Clean up video player when modal closes
+    document.getElementById('videoPlayerModal').addEventListener('hidden.bs.modal', function() {
+        if (player) {
+            player.dispose();
+            player = null;
+        }
+        currentRecording = null;
+    });
+});
+</script>
+
+<style>
+.recording-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.recording-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.card-img-top {
+    transition: opacity 0.2s;
+}
+
+.card-img-top:hover {
+    opacity: 0.9;
+}
+
+/* Fullscreen video styling */
+.video-js.vjs-fullscreen {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.video-js.vjs-fullscreen video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain;
+}
+
+/* Alternative: use 'fill' to stretch video to fill entire screen */
+.video-js.vjs-fullscreen.vjs-fill video {
+    object-fit: fill;
+}
+
+/* Alternative: use 'cover' to fill screen while maintaining aspect ratio (may crop) */
+.video-js.vjs-fullscreen.vjs-cover video {
+    object-fit: cover;
+}
+</style>
+{% endblock %}

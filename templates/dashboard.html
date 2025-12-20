@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1><i class="fas fa-tachometer-alt me-2"></i>Camera Dashboard</h1>
+    </div>
+</div>
+
+<!-- Camera Grid -->
+<div class="row mb-4">
+    <div class="col">
+        <h3><i class="fas fa-video me-2"></i>Cameras</h3>
+    </div>
+</div>
+
+<div class="row" id="camera-grid">
+    {% for camera in cameras %}
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card camera-card h-100">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-video me-2 text-primary"></i>{{ camera.name }}</h5>
+                    <span class="badge bg-{% if camera.connection_status == 'connected' %}success{% elif camera.connection_status == 'disconnected' %}danger{% else %}secondary{% endif %}">
+                        <i class="fas fa-circle" style="font-size: 0.6em;"></i>
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Quick Stats -->
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <div class="p-2 bg-light rounded text-center">
+                            <small class="text-muted d-block">Status</small>
+                            <strong class="text-{% if camera.status == 'active' %}success{% elif camera.status == 'online' %}info{% else %}secondary{% endif %}">
+                                {{ camera.status|title }}
+                            </strong>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 bg-light rounded text-center">
+                            <small class="text-muted d-block">Events (24h)</small>
+                            <strong class="text-primary">{{ camera.activity_24h }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Camera Info -->
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="text-muted"><i class="fas fa-network-wired me-1"></i>IP</small>
+                        <code class="small">{{ camera.ip or 'Unknown' }}</code>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted"><i class="fas fa-clock me-1"></i>Last Seen</small>
+                        <small>{{ camera.last_seen }}</small>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-grid gap-1 mb-2">
+                    <a href="{{ url_for('livestream_viewer', camera=camera.id) }}" class="btn btn-success btn-sm">
+                        <i class="fas fa-broadcast-tower"></i> Live Stream
+                    </a>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <a href="{{ url_for('camera_detail', camera_id=camera.id) }}" class="btn btn-outline-primary">
+                            <i class="fas fa-cog"></i> Settings
+                        </a>
+                        <a href="{{ url_for('camera_recordings', camera_id=camera.id) }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-film"></i> Recordings
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Mode Control -->
+                <div class="pt-2 border-top">
+                    <small class="text-muted d-block mb-1"><i class="fas fa-shield-alt me-1"></i>Mode</small>
+                    <div class="btn-group btn-group-sm w-100" role="group">
+                        <button class="btn btn-outline-success" onclick="sendCameraCommand('{{ camera.id }}', 'ARMED')" title="Arm Camera">
+                            Arm
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="sendCameraCommand('{{ camera.id }}', 'LIVESTREAMONLY')" title="Livestream Only Mode">
+                            Livestream Only
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="sendCameraCommand('{{ camera.id }}', 'PRIVACY')" title="Privacy Mode">
+                            Privacy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-history me-2"></i>Recent Activity</h5>
+                <a href="{{ url_for('events_page') }}" class="btn btn-sm btn-outline-primary">
+                    View All <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_events %}
+                <div class="list-group list-group-flush">
+                    {% for event in recent_events[:15] %}
+                    <div class="list-group-item">
+                        <div class="d-flex align-items-center gap-3">
+                            <!-- Thumbnail -->
+                            <div class="flex-shrink-0">
+                                {% if event.thumbnail_url %}
+                                <img src="{{ event.thumbnail_url }}" alt="Event thumbnail" class="rounded" style="width: 80px; height: 60px; object-fit: cover;" loading="lazy">
+                                {% else %}
+                                <div class="bg-secondary rounded d-flex align-items-center justify-content-center text-white" style="width: 80px; height: 60px;">
+                                    <i class="fas fa-video fa-2x"></i>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Event Details -->
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-running me-1"></i>{{ event.activity_type|title }}
+                                    </span>
+                                    {% if event.confidence %}
+                                    <span class="badge bg-light text-dark">{{ "%.0f"|format(event.confidence * 100) }}%</span>
+                                    {% endif %}
+                                    <span class="badge bg-secondary">{{ event.upload_status|title }}</span>
+                                </div>
+                                <div class="mb-1">
+                                    <strong>{{ event.camera_name }}</strong>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="fas fa-clock me-1"></i>{{ event.start_time }}
+                                    <span class="mx-2">•</span>
+                                    <i class="fas fa-stopwatch me-1"></i>{{ event.duration_str }}
+                                </small>
+                            </div>
+
+                            <!-- Play Button -->
+                            <div class="flex-shrink-0">
+                                {% if event.recording_path %}
+                                <button class="btn btn-primary btn-sm" onclick="playRecording('{{ event.event_id }}', '{{ event.camera_name }}', '{{ event.activity_type }}', '{{ event.start_time }}', '{{ event.duration_str }}', '{{ event.recording_filename or 'N/A' }}', '{{ event.upload_status }}')" title="Play Recording">
+                                    <i class="fas fa-play"></i> Play
+                                </button>
+                                {% else %}
+                                <button class="btn btn-outline-secondary btn-sm" disabled title="Recording not available">
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="fas fa-inbox fa-3x mb-3"></i>
+                    <p>No activity events recorded yet</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Video Player Modal -->
+<div class="modal fade" id="videoPlayerModal" tabindex="-1" aria-labelledby="videoPlayerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="videoPlayerModalLabel">Recording Playback</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="video-player-container">
+                    <!-- Video player will be inserted here -->
+                </div>
+                <div id="recording-info" class="mt-3">
+                    <!-- Recording details will be displayed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="download-recording">
+                    <i class="fas fa-download me-1"></i>Download
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Video.js for HLS playback -->
+<link href="https://vjs.zencdn.net/8.6.1/video-js.css" rel="stylesheet">
+<script src="https://vjs.zencdn.net/8.6.1/video.min.js"></script>
+
+<script>
+    function sendCameraCommand(cameraId, mode) {
+        // Send camera control command
+        fetch(`/api/control/mode/${cameraId}/${mode}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert(`Camera ${mode} command sent successfully!`);
+                // Refresh page to show new status
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                alert(`Failed to send command: ${result.error}`);
+            }
+        })
+        .catch(error => {
+            console.error('Command failed:', error);
+            alert('Failed to send camera command');
+        });
+    }
+
+    function updateDashboard() {
+        // Refresh camera status
+        fetch('/api/cameras')
+            .then(response => response.json())
+            .then(cameras => {
+                // Update camera grid (simplified for now)
+                console.log('Dashboard refreshed:', cameras.length, 'cameras');
+            })
+            .catch(error => console.error('Failed to refresh dashboard:', error));
+    }
+
+    // Video player variables
+    let player = null;
+    let currentEventId = null;
+
+    // Play recording in modal
+    function playRecording(eventId, cameraName, activityType, startTime, duration, filename, uploadStatus) {
+        currentEventId = eventId;
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('videoPlayerModal'));
+        modal.show();
+
+        // Initialize video player with HLS
+        const playerContainer = document.getElementById('video-player-container');
+        playerContainer.innerHTML = `
+            <video id="recording-player" class="video-js vjs-default-skin vjs-big-play-centered" controls preload="auto"
+                   style="width: 100%;">
+                <p class="vjs-no-js">
+                    To view this video please enable JavaScript, and consider upgrading to a web browser that
+                    <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+                </p>
+            </video>
+        `;
+
+        // Initialize Video.js player with responsive sizing
+        // Safari-friendly configuration: use native HLS playback
+        player = videojs('recording-player', {
+            controls: true,
+            autoplay: false,
+            preload: 'auto',
+            fluid: true,
+            responsive: true,
+            aspectRatio: '16:9',  // Default aspect ratio, will adjust to actual video
+            html5: {
+                nativeVideoTracks: true,
+                nativeAudioTracks: true,
+                nativeTextTracks: true,
+                hls: {
+                    overrideNative: false  // Use Safari's native HLS player
+                }
+            }
+        });
+
+        // Load HLS playlist
+        const playlistUrl = `/api/media/playlist/${eventId}.m3u8`;
+        player.src({
+            src: playlistUrl,
+            type: 'application/x-mpegURL'
+        });
+
+        // Handle player errors
+        player.on('error', function() {
+            const error = player.error();
+            console.error('Video player error:', error);
+
+            playerContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Playback Error</strong><br>
+                    ${error ? error.message : 'Failed to load video'}<br>
+                    <small>Event ID: ${eventId}</small>
+                </div>
+            `;
+        });
+
+        // Display recording info
+        const infoContainer = document.getElementById('recording-info');
+        const activityBadge = getActivityTypeBadge(activityType);
+        infoContainer.innerHTML = `
+            <h6>Recording Details</h6>
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Camera</dt>
+                <dd class="col-sm-9">${cameraName}</dd>
+
+                <dt class="col-sm-3">Event ID</dt>
+                <dd class="col-sm-9"><code>${eventId}</code></dd>
+
+                <dt class="col-sm-3">Date & Time</dt>
+                <dd class="col-sm-9">${startTime}</dd>
+
+                <dt class="col-sm-3">Type</dt>
+                <dd class="col-sm-9">${activityBadge}</dd>
+
+                <dt class="col-sm-3">Duration</dt>
+                <dd class="col-sm-9">${duration}</dd>
+
+                <dt class="col-sm-3">File</dt>
+                <dd class="col-sm-9"><small class="font-monospace">${filename}</small></dd>
+
+                <dt class="col-sm-3">Status</dt>
+                <dd class="col-sm-9">
+                    <span class="badge bg-${uploadStatus === 'completed' ? 'success' : 'warning'}">
+                        ${uploadStatus}
+                    </span>
+                </dd>
+            </dl>
+        `;
+    }
+
+    // Get activity type badge HTML
+    function getActivityTypeBadge(activityType) {
+        const types = {
+            'MOTION_SMART': '<span class="badge bg-danger"><i class="fas fa-user me-1"></i>Person</span>',
+            'MOTION_ALL': '<span class="badge bg-warning"><i class="fas fa-running me-1"></i>Motion</span>',
+            'PERSON': '<span class="badge bg-danger"><i class="fas fa-user me-1"></i>Person</span>',
+            'SOUND': '<span class="badge bg-info"><i class="fas fa-volume-up me-1"></i>Sound</span>',
+            'AUDIO_ALL': '<span class="badge bg-info"><i class="fas fa-volume-up me-1"></i>Sound</span>'
+        };
+
+        return types[activityType] || `<span class="badge bg-secondary">${activityType}</span>`;
+    }
+
+    // Download recording
+    function downloadRecording() {
+        if (!currentEventId) {
+            alert('No recording selected');
+            return;
+        }
+
+        // Show loading state
+        const btn = document.getElementById('download-recording');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Converting...';
+
+        // Trigger download
+        window.location.href = `/api/media/download/${currentEventId}`;
+
+        // Reset button after a delay
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }, 3000);
+    }
+
+    // Set up event listeners on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Download button in modal
+        document.getElementById('download-recording').addEventListener('click', downloadRecording);
+
+        // Clean up video player when modal closes
+        document.getElementById('videoPlayerModal').addEventListener('hidden.bs.modal', function() {
+            if (player) {
+                player.dispose();
+                player = null;
+            }
+            currentEventId = null;
+        });
+    });
+</script>
+
+<style>
+/* Fullscreen video styling */
+.video-js.vjs-fullscreen {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.video-js.vjs-fullscreen video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain;
+}
+
+/* Alternative: use 'fill' to stretch video to fill entire screen */
+.video-js.vjs-fullscreen.vjs-fill video {
+    object-fit: fill;
+}
+
+/* Alternative: use 'cover' to fill screen while maintaining aspect ratio (may crop) */
+.video-js.vjs-fullscreen.vjs-cover video {
+    object-fit: cover;
+}
+</style>
+{% endblock %}

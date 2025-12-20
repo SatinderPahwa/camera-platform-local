@@ -1,0 +1,1013 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1><i class="fas fa-tools me-2"></i>Admin Panel</h1>
+    </div>
+</div>
+
+<!-- Slack Cleanup Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fab fa-slack me-2"></i>Slack Message Cleanup
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    Clean up bot messages from your Slack notification channel. This keeps your channel organized,
+                    similar to clearing iPhone notifications.
+                </p>
+
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Note:</strong> Cleanup runs in the background. The page won't lock while processing.
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6><i class="fas fa-clock me-2"></i>Delete Messages Older Than 24 Hours</h6>
+                                <p class="text-muted small">Removes bot messages posted more than 24 hours ago. Recent messages are kept.</p>
+                                <button class="btn btn-warning btn-sm" onclick="cleanupSlack('24h')">
+                                    <i class="fas fa-broom me-2"></i>Clean 24h+ Messages
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h6><i class="fas fa-trash me-2"></i>Delete ALL Bot Messages</h6>
+                                <p class="text-muted small">Removes all bot messages from the channel, regardless of age.</p>
+                                <button class="btn btn-danger btn-sm" onclick="cleanupSlack('all')">
+                                    <i class="fas fa-trash-alt me-2"></i>Clean ALL Messages
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slack Cleanup Status -->
+                <div id="slack-status" class="mt-3" style="display: none;">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-spinner fa-spin me-2"></i>
+                                        <span id="slack-status-text">Processing...</span>
+                                    </h6>
+                                    <small class="text-muted" id="slack-status-details">Starting cleanup job...</small>
+                                </div>
+                                <div id="slack-status-progress" class="progress" style="width: 200px; height: 20px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+                                         style="width: 100%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slack Cleanup Result -->
+                <div id="slack-result" class="mt-3" style="display: none;">
+                    <div class="alert" id="slack-result-alert">
+                        <h6 id="slack-result-title"></h6>
+                        <div id="slack-result-details"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recording Cleanup Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0">
+                    <i class="fas fa-database me-2"></i>Recording Cleanup
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    Remove old recordings to free up disk space. Recordings are organized by camera and event type.
+                </p>
+
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Days to Keep</label>
+                        <input type="number" id="cleanup-days" class="form-control" value="28" min="1" max="365">
+                    </div>
+                    <div class="col-md-9">
+                        <label class="form-label">&nbsp;</label><br>
+                        <button class="btn btn-info btn-sm me-2" onclick="cleanupRecordings(true)">
+                            <i class="fas fa-search me-2"></i>Preview Cleanup
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="cleanupRecordings(false)">
+                            <i class="fas fa-trash me-2"></i>Delete Old Recordings
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Recording Cleanup Status -->
+                <div id="recording-status" class="mt-3" style="display: none;">
+                    <div class="alert alert-info">
+                        <i class="fas fa-spinner fa-spin me-2"></i>
+                        <span id="recording-status-text">Processing cleanup...</span>
+                    </div>
+                </div>
+
+                <!-- Recording Cleanup Result -->
+                <div id="recording-result" class="mt-3" style="display: none;">
+                    <div class="alert" id="recording-result-alert">
+                        <h6 id="recording-result-title"></h6>
+                        <div id="recording-result-details"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Storage Statistics -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>Storage Statistics
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2">Last 7 Days</h6>
+                                <h4 id="storage-week-mb">-</h4>
+                                <small class="text-muted" id="storage-week-count">- files</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2">Last 14 Days</h6>
+                                <h4 id="storage-twoweeks-mb">-</h4>
+                                <small class="text-muted" id="storage-twoweeks-count">- files</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-2">Last 28 Days</h6>
+                                <h4 id="storage-month-mb">-</h4>
+                                <small class="text-muted" id="storage-month-count">- files</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card text-center bg-danger text-white">
+                            <div class="card-body">
+                                <h6 class="mb-2">Older Than 28 Days</h6>
+                                <h4 id="storage-old-mb">-</h4>
+                                <small id="storage-old-count">- files</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Camera Wizard -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-plus-circle me-2"></i>Add New Camera
+                </h5>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-success" onclick="startAddCameraWizard()">
+                    <i class="fas fa-magic me-2"></i>Start Add Camera Wizard
+                </button>
+                <p class="text-muted mt-2 mb-0">
+                    <small>6-step guided wizard to add and configure a new camera</small>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Camera List -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-video me-2"></i>Camera List
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>ID</th>
+                                <th>IP Address</th>
+                                <th>Status</th>
+                                <th>Connection</th>
+                                <th>Firmware</th>
+                                <th>Last Seen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for camera in cameras %}
+                            <tr>
+                                <td><strong>{{ camera.name }}</strong></td>
+                                <td><code class="small">{{ camera.id[:16] }}...</code></td>
+                                <td><code>{{ camera.ip or 'Unknown' }}</code></td>
+                                <td>
+                                    <span class="badge bg-{% if camera.status == 'active' %}success{% elif camera.status == 'online' %}info{% else %}secondary{% endif %}">
+                                        {{ camera.status|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if camera.connection_status == 'connected' %}success{% else %}danger{% endif %}">
+                                        {{ camera.connection_status|title }}
+                                    </span>
+                                </td>
+                                <td><code class="small text-success">{{ camera.firmware_version or 'Unknown' }}</code></td>
+                                <td><small>{{ camera.last_seen }}</small></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Camera Wizard Modal -->
+<div class="modal fade" id="addCameraWizardModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-video me-2"></i>Add New Camera - Step <span id="wizard-step-number">1</span> of 6
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Progress Bar -->
+                <div class="progress mb-4" style="height: 30px;">
+                    <div id="wizard-progress" class="progress-bar bg-success progress-bar-striped"
+                         style="width: 16.66%">Step 1</div>
+                </div>
+
+                <!-- Step 1: Flash Camera Firmware -->
+                <div id="wizard-step-1" class="wizard-step">
+                    <h5><i class="fas fa-microchip me-2"></i>Step 1: Flash Camera with Unlocked Firmware</h5>
+                    <div class="alert alert-info">
+                        <strong>Before you begin:</strong> You need to flash the camera with unlocked firmware using AmbaUSB tool on Windows.
+                    </div>
+
+                    <h6 class="mt-3"><i class="fas fa-download me-2"></i>Download Required Tools:</h6>
+                    <ul>
+                        <li><strong>AmbaUSB Flashing Tool</strong> - Get from Google Drive or download from web</li>
+                        <li><strong>Unlocked Firmware File</strong> - Get from Google Drive</li>
+                        <li><strong>FileZilla (FTP Client)</strong> - Download from <a href="https://filezilla-project.org" target="_blank">filezilla-project.org</a> (needed for uploading config files in later steps)</li>
+                        <li><strong>USB Cable</strong> - Note: Only certain types of USB cables work</li>
+                        <li><strong>Pin or paperclip</strong> - For pressing reset button</li>
+                    </ul>
+
+                    <h6 class="mt-3"><i class="fas fa-list-ol me-2"></i>Flashing Steps:</h6>
+                    <ol>
+                        <li><strong>Install AmbaUSB</strong> on a Windows computer</li>
+                        <li><strong>Open</strong> AmbaUSB/bin/ambausb.exe</li>
+                        <li><strong>Choose Board Config:</strong> Select <code>S2E.DDR3.EMMC</code> from dropdown</li>
+                        <li><strong>Select Firmware:</strong> Browse and select the unlocked firmware file</li>
+                        <li><strong>Connect Camera:</strong>
+                            <ul class="mt-2">
+                                <li>Keep pressing the <strong>reset button</strong> with a pin</li>
+                                <li>While holding reset, connect USB cable to camera</li>
+                                <li>You should see: "S2E(A9S) is Ready"</li>
+                            </ul>
+                        </li>
+                        <li><strong>Flash Firmware:</strong> Click the blue arrow to download firmware</li>
+                        <li><strong>Wait</strong> until progress reaches 100%</li>
+                    </ol>
+
+                    <div class="alert alert-success mt-3">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Next Step:</strong> Once firmware flashing reaches 100%, disconnect the camera and proceed to Step 2 for initialization via serial connection.
+                    </div>
+
+                    <div class="alert alert-warning mt-2">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Important:</strong> Unlocked firmware is required for root access, FTP transfers,
+                        database modifications, and full camera control via MQTT. You cannot telnet to the camera yet - WiFi must be configured first in Step 2.
+                    </div>
+                </div>
+
+                <!-- Step 2: Camera Initialization -->
+                <div id="wizard-step-2" class="wizard-step" style="display: none;">
+                    <h5><i class="fas fa-cog me-2"></i>Step 2: Camera Initialization</h5>
+                    <div class="alert alert-info">
+                        <strong>Connect via Serial:</strong> Use USB cable and terminal to initialize camera settings and get Camera ID.
+                    </div>
+
+                    <h6 class="mt-3"><i class="fas fa-plug me-2"></i>Serial Connection Setup:</h6>
+                    <ol>
+                        <li><strong>Connect camera to Mac</strong> using USB cable</li>
+                        <li><strong>Find device:</strong> In terminal, run:
+                            <pre class="bg-light p-2 mt-2">ls /dev/tty.*</pre>
+                            Look for device starting with <code>usb...</code>
+                        </li>
+                        <li><strong>Connect to camera:</strong>
+                            <pre class="bg-light p-2 mt-2">screen /dev/tty.usb... 115200</pre>
+                            <small class="text-muted">Replace <code>/dev/tty.usb...</code> with actual device name</small>
+                        </li>
+                        <li><strong>Login:</strong> When prompted, enter:
+                            <pre class="bg-light p-2 mt-2">User: root
+Password: (press Enter - no password initially)</pre>
+                        </li>
+                    </ol>
+
+                    <h6 class="mt-3"><i class="fas fa-terminal me-2"></i>Camera Initialization Commands:</h6>
+                    <ol start="4">
+                        <li><strong>Set root password:</strong>
+                            <pre class="bg-light p-2 mt-2">passwd root</pre>
+                            Enter password twice (we typically use: <code>admin123</code>)
+                        </li>
+                        <li><strong>Configure WiFi:</strong>
+                            <pre class="bg-light p-2 mt-2">nmcli dev wifi connect &lt;wifi-name&gt; password &lt;wifi-password&gt;</pre>
+                        </li>
+                        <li><strong>Run shipment command:</strong>
+                            <pre class="bg-light p-2 mt-2">shipment</pre>
+                            <small class="text-muted">This configures production settings</small>
+                        </li>
+                        <li><strong>Get Camera ID:</strong>
+                            <pre class="bg-light p-2 mt-2">cd /cali/certs
+ls *.crt</pre>
+                            <strong>Note down the Camera ID</strong> from certificate filename (32 hex characters before .crt)
+                        </li>
+                        <li><strong>Get IP address:</strong>
+                            <pre class="bg-light p-2 mt-2">ifconfig</pre>
+                            Note the camera's IP address on your network
+                        </li>
+                        <li><strong>Reboot camera:</strong>
+                            <pre class="bg-light p-2 mt-2">reboot</pre>
+                        </li>
+                    </ol>
+
+                    <div class="alert alert-success mt-3">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Important Information to Save:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Camera ID (32 hex characters)</li>
+                            <li>Camera IP address</li>
+                            <li>Root password (admin123)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Step 3: Enter Camera Information -->
+                <div id="wizard-step-3" class="wizard-step" style="display: none;">
+                    <h5><i class="fas fa-keyboard me-2"></i>Step 3: Enter Camera Information</h5>
+                    <form id="camera-info-form">
+                        <div class="mb-3">
+                            <label class="form-label">Camera ID <span class="text-danger">*</span></label>
+                            <input type="text" id="wizard-camera-id" class="form-control"
+                                   placeholder="67E48798E70345179A86980A7CAAAE73"
+                                   pattern="[A-Fa-f0-9]{32}"
+                                   maxlength="32"
+                                   required>
+                            <small class="text-muted">32 hex characters from shipment command output</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Camera Name <span class="text-danger">*</span></label>
+                            <input type="text" id="wizard-camera-name" class="form-control"
+                                   placeholder="Front Door Camera"
+                                   required>
+                            <small class="text-muted">Friendly name for the camera</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Camera IP Address <span class="text-danger">*</span></label>
+                            <input type="text" id="wizard-camera-ip" class="form-control"
+                                   placeholder="192.168.1.150"
+                                   required>
+                            <small class="text-muted">Camera's local network IP address</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Camera Root Password <span class="text-danger">*</span></label>
+                            <input type="password" id="wizard-camera-password" class="form-control"
+                                   value="admin123"
+                                   required>
+                            <small class="text-muted">Password set in Step 2 (default: admin123)</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Server IP Address <span class="text-danger">*</span></label>
+                            <input type="text" id="wizard-server-ip" class="form-control"
+                                   placeholder="192.168.1.100"
+                                   required>
+                            <small class="text-muted">Your server's LOCAL_IP that camera can reach</small>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Step 4: Register Camera in Backend -->
+                <div id="wizard-step-4" class="wizard-step" style="display: none;">
+                    <h5><i class="fas fa-cloud me-2"></i>Step 4: Register Camera in Backend</h5>
+                    <p>Registering camera with AWS IoT Core and generating certificates...</p>
+                    <div id="step4-status">
+                        <div class="alert alert-info">
+                            <i class="fas fa-spinner fa-spin me-2"></i>
+                            <span id="step4-status-text">Initializing...</span>
+                        </div>
+                    </div>
+                    <div id="step4-result" style="display: none;">
+                        <div class="alert alert-success">
+                            <h6><i class="fas fa-check-circle me-2"></i>Registration Complete!</h6>
+                            <div id="step4-details"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 5: Push Configuration to Camera -->
+                <div id="wizard-step-5" class="wizard-step" style="display: none;">
+                    <h5><i class="fas fa-upload me-2"></i>Step 5: Push Configuration to Camera</h5>
+
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle me-2"></i>Two Methods Available</h6>
+                        <p class="mb-0">You can either use the automated API push or manually copy files via FTP/FileZilla.</p>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header bg-primary text-white">
+                                    <strong>Method 1: Automated (Recommended)</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p class="small">Push files automatically via API</p>
+                                    <div id="step5-status">
+                                        <button class="btn btn-primary btn-sm" onclick="pushCameraConfig()">
+                                            <i class="fas fa-upload me-2"></i>Push Configuration
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header bg-success text-white">
+                                    <strong>Method 2: Manual (Alternative)</strong>
+                                </div>
+                                <div class="card-body">
+                                    <p class="small">Copy files from <code>camera_setup/ready_to_push/</code></p>
+                                    <ol class="small mb-2">
+                                        <li>Connect via FTP to camera</li>
+                                        <li>Upload 4 files to destinations</li>
+                                        <li>Reboot camera</li>
+                                    </ol>
+                                    <a href="https://github.com/yourusername/camera-project/tree/main/camera_setup/ready_to_push"
+                                       target="_blank" class="btn btn-success btn-sm">
+                                        <i class="fas fa-folder me-1"></i>View Files
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card bg-light mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title">Files to Upload:</h6>
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>File</th>
+                                        <th>Destination</th>
+                                        <th>Size</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>ca-bundle.trust.crt</code></td>
+                                        <td><code>/etc/ssl/certs/ca-bundle.trust.crt</code></td>
+                                        <td>729 KB</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>cali-mqttCA.crt</code></td>
+                                        <td><code>/cali/certs/mqttCA.crt</code></td>
+                                        <td>3.5 KB</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>working_mqttCA.crt</code></td>
+                                        <td><code>/root/certs/mqttCA.crt</code></td>
+                                        <td>1.2 KB</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>master_ctrl.db</code></td>
+                                        <td><code>/cali/master_ctrl.db</code></td>
+                                        <td>48 KB</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="step5-progress" style="display: none;">
+                        <div class="alert alert-info">
+                            <i class="fas fa-spinner fa-spin me-2"></i>
+                            <span id="step5-status-text">Uploading files...</span>
+                        </div>
+                    </div>
+                    <div id="step5-result" style="display: none;">
+                        <div class="alert" id="step5-result-alert">
+                            <h6 id="step5-result-title"></h6>
+                            <div id="step5-details"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 6: Test & Verify -->
+                <div id="wizard-step-6" class="wizard-step" style="display: none;">
+                    <h5><i class="fas fa-check-circle me-2"></i>Step 6: Test & Verify</h5>
+                    <div class="alert alert-success">
+                        <h6><i class="fas fa-thumbs-up me-2"></i>Camera Setup Complete!</h6>
+                        <p>The camera should connect to AWS IoT Core within 1-2 minutes.</p>
+                    </div>
+
+                    <h6>Verification Steps:</h6>
+                    <ol>
+                        <li><strong>Wait 1-2 minutes</strong> for camera to reboot and connect</li>
+                        <li><strong>Check Dashboard:</strong> Camera should appear as "Connected"
+                            <br><a href="{{ url_for('index') }}" target="_blank" class="btn btn-sm btn-info mt-2">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Dashboard
+                            </a>
+                        </li>
+                        <li><strong>AWS IoT Console:</strong> Verify Thing shows <code>connected: true</code>
+                            <br><a href="https://console.aws.amazon.com/iot/" target="_blank" class="btn btn-sm btn-info mt-2">
+                                <i class="fas fa-external-link-alt me-1"></i>Open AWS IoT Console
+                            </a>
+                        </li>
+                        <li><strong>Send Test Command:</strong> Try arming/disarming camera from dashboard</li>
+                    </ol>
+
+                    <h6 class="mt-3">Camera Details:</h6>
+                    <table class="table table-sm">
+                        <tr>
+                            <td><strong>Camera ID:</strong></td>
+                            <td><code id="final-camera-id"></code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Camera Name:</strong></td>
+                            <td><span id="final-camera-name"></span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Camera IP:</strong></td>
+                            <td><code id="final-camera-ip"></code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>AWS IoT Thing:</strong></td>
+                            <td><code>vbc01-camera-<span id="final-thing-id"></span></code></td>
+                        </tr>
+                    </table>
+
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle me-2"></i>Troubleshooting</h6>
+                        <p>If camera doesn't connect:</p>
+                        <ul class="mb-0">
+                            <li>Check camera can reach server IP via telnet</li>
+                            <li>Verify certificates uploaded correctly: <code>wc -c /root/certs/mqttCA.crt</code> should show 1187</li>
+                            <li>Check camera logs: <code>tail -f /var/log/messages | grep -i https</code></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="wizard-prev-btn" onclick="wizardPrev()" style="display: none;">
+                    <i class="fas fa-arrow-left me-2"></i>Previous
+                </button>
+                <button type="button" class="btn btn-primary" id="wizard-next-btn" onclick="wizardNext()">
+                    Next <i class="fas fa-arrow-right ms-2"></i>
+                </button>
+                <button type="button" class="btn btn-success" id="wizard-finish-btn" onclick="wizardFinish()" style="display: none;">
+                    <i class="fas fa-check me-2"></i>Finish
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Load storage statistics on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadStorageStats();
+});
+
+function loadStorageStats() {
+    fetch('/api/admin/storage/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Total size display removed - not in current UI
+
+                document.getElementById('storage-week-mb').textContent = data.by_age.week.size_mb + ' MB';
+                document.getElementById('storage-week-count').textContent = data.by_age.week.count + ' files';
+
+                document.getElementById('storage-twoweeks-mb').textContent = data.by_age.two_weeks.size_mb + ' MB';
+                document.getElementById('storage-twoweeks-count').textContent = data.by_age.two_weeks.count + ' files';
+
+                document.getElementById('storage-month-mb').textContent = data.by_age.month.size_mb + ' MB';
+                document.getElementById('storage-month-count').textContent = data.by_age.month.count + ' files';
+
+                document.getElementById('storage-old-mb').textContent = data.by_age.older_than_month.size_mb + ' MB';
+                document.getElementById('storage-old-count').textContent = data.by_age.older_than_month.count + ' files';
+            }
+        })
+        .catch(error => console.error('Failed to load storage stats:', error));
+}
+
+// Slack Cleanup Functions
+function cleanupSlack(mode) {
+    const modeText = mode === '24h' ? 'messages older than 24 hours' : 'ALL messages';
+
+    if (!confirm(`Delete ${modeText} from Slack?\n\nThis will:\n- Delete bot messages permanently\n- Run in the background\n- Cannot be undone\n\nContinue?`)) {
+        return;
+    }
+
+    // Show status
+    document.getElementById('slack-status').style.display = 'block';
+    document.getElementById('slack-result').style.display = 'none';
+    document.getElementById('slack-status-text').textContent = 'Starting cleanup...';
+    document.getElementById('slack-status-details').textContent = `Deleting ${modeText}`;
+
+    // Start cleanup job
+    fetch('/api/admin/slack/cleanup', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({mode: mode})
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            // Poll for job status
+            pollSlackJobStatus(result.job_id);
+        } else {
+            showSlackError(result.error || 'Failed to start cleanup job');
+        }
+    })
+    .catch(error => {
+        console.error('Slack cleanup failed:', error);
+        showSlackError('Failed to start cleanup: ' + error.message);
+    });
+}
+
+function pollSlackJobStatus(jobId) {
+    const poll = setInterval(() => {
+        fetch(`/api/admin/slack/cleanup/${jobId}/status`)
+            .then(response => response.json())
+            .then(result => {
+                if (result.status === 'running') {
+                    // Update progress
+                    if (result.progress) {
+                        document.getElementById('slack-status-text').textContent = 'Processing...';
+                        document.getElementById('slack-status-details').textContent =
+                            `Deleted: ${result.progress.deleted || 0}, Skipped: ${result.progress.skipped || 0}, Failed: ${result.progress.failed || 0}`;
+                    }
+                } else if (result.status === 'completed') {
+                    clearInterval(poll);
+                    showSlackSuccess(result.result);
+                } else if (result.status === 'failed') {
+                    clearInterval(poll);
+                    showSlackError(result.error || 'Job failed');
+                }
+            })
+            .catch(error => {
+                console.error('Failed to poll job status:', error);
+                clearInterval(poll);
+                showSlackError('Lost connection to cleanup job');
+            });
+    }, 2000); // Poll every 2 seconds
+}
+
+function showSlackSuccess(result) {
+    document.getElementById('slack-status').style.display = 'none';
+    document.getElementById('slack-result').style.display = 'block';
+
+    const alert = document.getElementById('slack-result-alert');
+    alert.className = 'alert alert-success';
+
+    const title = document.getElementById('slack-result-title');
+    title.innerHTML = '<i class="fas fa-check-circle me-2"></i>Cleanup Complete!';
+
+    const details = `
+        <ul class="mb-0">
+            <li><strong>Deleted:</strong> ${result.deleted || 0} messages</li>
+            <li><strong>Skipped:</strong> ${result.skipped || 0} messages</li>
+            <li><strong>Failed:</strong> ${result.failed || 0} messages</li>
+            <li><strong>Total:</strong> ${result.total || 0} messages processed</li>
+        </ul>
+    `;
+
+    document.getElementById('slack-result-details').innerHTML = details;
+}
+
+function showSlackError(error) {
+    document.getElementById('slack-status').style.display = 'none';
+    document.getElementById('slack-result').style.display = 'block';
+
+    const alert = document.getElementById('slack-result-alert');
+    alert.className = 'alert alert-danger';
+
+    const title = document.getElementById('slack-result-title');
+    title.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>Cleanup Failed';
+
+    document.getElementById('slack-result-details').innerHTML = `<strong>Error:</strong> ${error}`;
+}
+
+// Recording Cleanup Functions
+function cleanupRecordings(dryRun) {
+    const days = parseInt(document.getElementById('cleanup-days').value);
+
+    if (days < 1 || days > 365) {
+        alert('Days must be between 1 and 365');
+        return;
+    }
+
+    if (!dryRun && !confirm(`Delete recordings older than ${days} days?\n\nThis cannot be undone!`)) {
+        return;
+    }
+
+    // Show status
+    document.getElementById('recording-status').style.display = 'block';
+    document.getElementById('recording-result').style.display = 'none';
+    document.getElementById('recording-status-text').textContent =
+        dryRun ? 'Analyzing recordings...' : 'Deleting old recordings...';
+
+    // Start cleanup
+    fetch('/api/admin/cleanup', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            days: days,
+            dry_run: dryRun
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        document.getElementById('recording-status').style.display = 'none';
+        document.getElementById('recording-result').style.display = 'block';
+
+        const alert = document.getElementById('recording-result-alert');
+        const title = document.getElementById('recording-result-title');
+        const details = document.getElementById('recording-result-details');
+
+        if (result.success) {
+            alert.className = 'alert alert-' + (dryRun ? 'info' : 'success');
+            title.innerHTML = '<i class="fas fa-check-circle me-2"></i>' + result.message;
+
+            const stats = result.stats;
+            details.innerHTML = `
+                <ul class="mb-0">
+                    <li><strong>Events ${dryRun ? 'would be' : ''} deleted:</strong> ${stats.events_deleted || 0}</li>
+                    <li><strong>Files ${dryRun ? 'would be' : ''} deleted:</strong> ${stats.files_deleted || 0}</li>
+                    <li><strong>Orphaned DB entries:</strong> ${stats.orphaned_db_entries || 0}</li>
+                    <li><strong>Space ${dryRun ? 'would be' : ''} freed:</strong> ${stats.space_freed || '0 B'}</li>
+                </ul>
+            `;
+
+            // Reload storage stats after actual cleanup
+            if (!dryRun) {
+                loadStorageStats();
+            }
+        } else {
+            alert.className = 'alert alert-danger';
+            title.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>Cleanup Failed';
+            details.innerHTML = `<strong>Error:</strong> ${result.error}`;
+        }
+    })
+    .catch(error => {
+        document.getElementById('recording-status').style.display = 'none';
+        document.getElementById('recording-result').style.display = 'block';
+
+        const alert = document.getElementById('recording-result-alert');
+        alert.className = 'alert alert-danger';
+        document.getElementById('recording-result-title').innerHTML =
+            '<i class="fas fa-exclamation-circle me-2"></i>Request Failed';
+        document.getElementById('recording-result-details').innerHTML =
+            `<strong>Error:</strong> ${error.message}`;
+    });
+}
+
+// ============================================================================
+// Add Camera Wizard Functions
+// ============================================================================
+
+let currentWizardStep = 1;
+let wizardCameraData = {};
+
+function startAddCameraWizard() {
+    currentWizardStep = 1;
+    wizardCameraData = {};
+    showWizardStep(1);
+    const modal = new bootstrap.Modal(document.getElementById('addCameraWizardModal'));
+    modal.show();
+}
+
+function showWizardStep(step) {
+    // Hide all steps
+    for (let i = 1; i <= 6; i++) {
+        document.getElementById(`wizard-step-${i}`).style.display = 'none';
+    }
+
+    // Show current step
+    document.getElementById(`wizard-step-${step}`).style.display = 'block';
+    document.getElementById('wizard-step-number').textContent = step;
+
+    // Update progress bar
+    const progress = (step / 6) * 100;
+    const progressBar = document.getElementById('wizard-progress');
+    progressBar.style.width = progress + '%';
+    progressBar.textContent = `Step ${step}`;
+
+    // Update buttons
+    if (step === 1) {
+        document.getElementById('wizard-prev-btn').style.display = 'none';
+    } else {
+        document.getElementById('wizard-prev-btn').style.display = 'inline-block';
+    }
+
+    if (step === 6) {
+        document.getElementById('wizard-next-btn').style.display = 'none';
+        document.getElementById('wizard-finish-btn').style.display = 'inline-block';
+    } else {
+        document.getElementById('wizard-next-btn').style.display = 'inline-block';
+        document.getElementById('wizard-finish-btn').style.display = 'none';
+    }
+
+    currentWizardStep = step;
+}
+
+function wizardNext() {
+    if (currentWizardStep === 3) {
+        // Validate form
+        const form = document.getElementById('camera-info-form');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        // Save form data
+        wizardCameraData.camera_id = document.getElementById('wizard-camera-id').value.trim().toUpperCase();
+        wizardCameraData.camera_name = document.getElementById('wizard-camera-name').value.trim();
+        wizardCameraData.camera_ip = document.getElementById('wizard-camera-ip').value.trim();
+        wizardCameraData.camera_password = document.getElementById('wizard-camera-password').value;
+        wizardCameraData.server_ip = document.getElementById('wizard-server-ip').value.trim();
+
+        // Move to step 4 and automatically register
+        showWizardStep(4);
+        registerCamera();
+        return;
+    }
+
+    if (currentWizardStep < 6) {
+        showWizardStep(currentWizardStep + 1);
+    }
+}
+
+function wizardPrev() {
+    if (currentWizardStep > 1) {
+        showWizardStep(currentWizardStep - 1);
+    }
+}
+
+function wizardFinish() {
+    bootstrap.Modal.getInstance(document.getElementById('addCameraWizardModal')).hide();
+    // Refresh page to show new camera
+    setTimeout(() => location.reload(), 500);
+}
+
+function registerCamera() {
+    document.getElementById('step4-status').style.display = 'block';
+    document.getElementById('step4-result').style.display = 'none';
+    document.getElementById('step4-status-text').textContent = 'Creating AWS IoT Thing...';
+
+    fetch('/api/admin/camera/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            camera_id: wizardCameraData.camera_id,
+            camera_name: wizardCameraData.camera_name,
+            camera_ip: wizardCameraData.camera_ip
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            document.getElementById('step4-status').style.display = 'none';
+            document.getElementById('step4-result').style.display = 'block';
+
+            const details = `
+                <ul>
+                    <li><strong>Camera ID:</strong> ${result.camera_id}</li>
+                    <li><strong>Camera Name:</strong> ${result.camera_name}</li>
+                    <li><strong>AWS IoT Thing:</strong> vbc01-camera-${result.camera_id}</li>
+                    <li><strong>Certificates:</strong> Generated and saved</li>
+                </ul>
+                <p class="mb-0"><small>Click "Next" to push configuration to camera</small></p>
+            `;
+
+            document.getElementById('step4-details').innerHTML = details;
+
+            // Auto-advance to step 5 after 2 seconds
+            setTimeout(() => showWizardStep(5), 2000);
+        } else {
+            document.getElementById('step4-status').style.display = 'none';
+            document.getElementById('step4-result').style.display = 'block';
+            document.getElementById('step4-result').className = 'alert alert-danger';
+            document.getElementById('step4-details').innerHTML = `<strong>Error:</strong> ${result.error}`;
+        }
+    })
+    .catch(error => {
+        document.getElementById('step4-status').style.display = 'none';
+        document.getElementById('step4-result').style.display = 'block';
+        document.getElementById('step4-result').className = 'alert alert-danger';
+        document.getElementById('step4-details').innerHTML = `<strong>Error:</strong> ${error.message}`;
+    });
+}
+
+function pushCameraConfig() {
+    document.getElementById('step5-status').style.display = 'none';
+    document.getElementById('step5-progress').style.display = 'block';
+    document.getElementById('step5-result').style.display = 'none';
+    document.getElementById('step5-status-text').textContent = 'Uploading certificates via FTP...';
+
+    fetch('/api/admin/camera/push_config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            camera_id: wizardCameraData.camera_id,
+            camera_ip: wizardCameraData.camera_ip,
+            camera_password: wizardCameraData.camera_password,
+            server_ip: wizardCameraData.server_ip
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        document.getElementById('step5-progress').style.display = 'none';
+        document.getElementById('step5-result').style.display = 'block';
+
+        if (result.success) {
+            document.getElementById('step5-result-alert').className = 'alert alert-success';
+            document.getElementById('step5-result-title').innerHTML = '<i class="fas fa-check-circle me-2"></i>Configuration Pushed Successfully!';
+
+            let details = '<ul>';
+            result.steps.forEach(step => {
+                details += `<li>${step}</li>`;
+            });
+            details += '</ul><p class="mb-0"><small>Camera will reboot and connect within 1-2 minutes. Click "Next" to continue.</small></p>';
+
+            document.getElementById('step5-details').innerHTML = details;
+
+            // Populate final step details
+            document.getElementById('final-camera-id').textContent = wizardCameraData.camera_id;
+            document.getElementById('final-camera-name').textContent = wizardCameraData.camera_name;
+            document.getElementById('final-camera-ip').textContent = wizardCameraData.camera_ip;
+            document.getElementById('final-thing-id').textContent = wizardCameraData.camera_id;
+
+            // Auto-advance to step 6 after 3 seconds
+            setTimeout(() => showWizardStep(6), 3000);
+        } else {
+            document.getElementById('step5-result-alert').className = 'alert alert-danger';
+            document.getElementById('step5-result-title').innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>Configuration Push Failed';
+            document.getElementById('step5-details').innerHTML = `<strong>Error:</strong> ${result.error}`;
+        }
+    })
+    .catch(error => {
+        document.getElementById('step5-progress').style.display = 'none';
+        document.getElementById('step5-result').style.display = 'block';
+        document.getElementById('step5-result-alert').className = 'alert alert-danger';
+        document.getElementById('step5-result-title').innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>Request Failed';
+        document.getElementById('step5-details').innerHTML = `<strong>Error:</strong> ${error.message}`;
+    });
+}
+</script>
+{% endblock %}
