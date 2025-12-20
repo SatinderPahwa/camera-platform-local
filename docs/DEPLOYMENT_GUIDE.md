@@ -512,7 +512,7 @@ sudo chmod 600 /etc/emqx/certs/*.key
 sudo systemctl restart emqx
 
 # Verify EMQX is listening on 8883
-emqx ctl listeners
+sudo emqx ctl listeners
 ```
 
 ### Step 2.5: Start Platform Services
@@ -768,8 +768,8 @@ http://YOUR_SERVER_IP:18083
 ./scripts/managed_status.sh
 
 # Check EMQX
-emqx ctl status
-emqx ctl listeners
+sudo emqx ctl status
+sudo emqx ctl listeners
 
 # Check logs for errors
 grep -i error logs/*.log
@@ -779,6 +779,12 @@ python3 tools/test_emqx.py
 ```
 
 ### Common Issues
+
+**EMQX won't start:**
+- Check logs: `sudo journalctl -u emqx -n 50`
+- If "cert_file_not_found" errors, verify certificate paths in `/etc/emqx/emqx.conf` use absolute paths: `/etc/emqx/certs/`
+- Verify certificates exist: `sudo ls -l /etc/emqx/certs/`
+- Check permissions: `sudo chown -R emqx:emqx /etc/emqx/certs`
 
 **Camera not connecting:**
 - Check domain resolves: `ping YOUR_DOMAIN`

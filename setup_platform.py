@@ -411,10 +411,10 @@ log.file_handlers.default {{
 listeners.ssl.default {{
   bind = "0.0.0.0:8883"
   ssl_options {{
-    # Certificate files
-    cacertfile = "etc/certs/ca.crt"
-    certfile = "etc/certs/broker.crt"
-    keyfile = "etc/certs/broker.key"
+    # Certificate files (absolute paths)
+    cacertfile = "/etc/emqx/certs/ca.crt"
+    certfile = "/etc/emqx/certs/broker.crt"
+    keyfile = "/etc/emqx/certs/broker.key"
 
     # Mutual TLS (mTLS) - Require client certificates
     verify = verify_peer
