@@ -158,7 +158,7 @@ class PlatformSetup:
                 '-key', 'ca.key',
                 '-sha256', '-days', '3650',
                 '-out', 'ca.crt',
-                '-subj', f'/C=UK/ST=London/L=London/O=Camera Platform/OU=Infrastructure/CN=Camera Platform Root CA'
+                '-subj', '/CN=Config Server CA'
             ], check=True, capture_output=True)
             print("  ✅ CA certificate generated")
 
@@ -173,7 +173,7 @@ class PlatformSetup:
                 'openssl', 'req', '-new',
                 '-key', 'broker.key',
                 '-out', 'broker.csr',
-                '-subj', f'/C=UK/ST=London/L=London/O=Camera Platform/OU=Config Server/CN={self.config["local_ip"]}'
+                '-subj', f'/CN={self.config["local_ip"]}'
             ], check=True, capture_output=True)
 
             # Create extensions file for SAN
@@ -218,7 +218,7 @@ IP.1 = {self.config['local_ip']}
                 'openssl', 'req', '-new',
                 '-key', 'camera_client.key',
                 '-out', 'camera_client.csr',
-                '-subj', '/C=UK/ST=London/L=London/O=Camera Platform/OU=Camera Client/CN=camera_client'
+                '-subj', '/CN=camera_client'
             ], check=True, capture_output=True)
 
             with open('client_ext.cnf', 'w') as f:
