@@ -314,8 +314,10 @@ CONFIG_SERVER_PORT=8443
 # ============================================================================
 # MQTT Configuration
 # ============================================================================
+# Local MQTT broker connection (processor connects to local EMQX)
+# Port 1883 for non-TLS local connections (use 8883 only if MQTT_USE_TLS=true)
 MQTT_BROKER_HOST=127.0.0.1
-MQTT_BROKER_PORT=8883
+MQTT_BROKER_PORT=1883
 MQTT_KEEPALIVE=60
 MQTT_USE_TLS=false
 PROCESSOR_CLIENT_ID=camera_event_processor
