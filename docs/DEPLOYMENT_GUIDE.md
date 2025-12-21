@@ -50,17 +50,16 @@ Before starting, have these ready:
 ### 5. Router Configuration
 
 **Required port forwarding (for remote access):**
-- Port 80 (TCP) - Temporary for SSL certificate validation
-- Port 443 (TCP) - HTTPS web dashboard access
+- Port 5000 (TCP) - Dashboard HTTPS access
 - Port 3478 (TCP/UDP) - TURN server
 - Port 5349 (TCP/UDP) - TURN server (TLS)
 - Port 49152-65535 (UDP) - TURN relay ports
 
 **NOT needed (local network only):**
-- Port 80 (IP address) - Config server (cameras connect to local IP, not domain)
+- Port 80 - Config server (cameras connect locally via IP address)
 - Port 8883 - EMQX MQTT (cameras connect locally)
 
-**Note:** Port 80 forwarding is only needed if cameras are located outside your local network. Cameras connect to the server's **local IP address** on port 80, while external users connect to the **domain name** on port 80→443. There is no conflict because Nginx listens on `0.0.0.0:80` for the domain, and the config server listens on `LOCAL_IP:80` (specific IP binding).
+**Note:** Dashboard is accessed as `https://your-domain.com:5000` (note the port number in URL)
 
 ---
 
@@ -254,123 +253,60 @@ response-origin-only-with-rfc5780
 
 **Don't start coturn yet** - we need SSL certificates first.
 
-### Step 1.5: Install Nginx
+### Step 1.5: Get SSL Certificates (Let's Encrypt) - DNS-01 Challenge
 
-```bash
-# Install Nginx
-sudo apt install -y nginx
+**Why DNS-01 Challenge:**
+- Config server runs on port 80 (cameras need it)
+- No need to stop services during renewal
+- No port forwarding required for Let's Encrypt
+- More secure (no ports exposed just for certificate renewal)
 
-# Stop default server
-sudo systemctl stop nginx
-```
-
-We'll configure Nginx after getting SSL certificates.
-
-### Step 1.6: Get SSL Certificates (Let's Encrypt)
-
-**IMPORTANT Prerequisites:**
-1. ✅ **DNS:** Your domain must resolve to your server's public IP
-   ```bash
-   nslookup YOUR_DOMAIN  # Should return your public IP
-   ```
-
-2. ✅ **Router Port Forwarding:** Forward port 80 from public IP to server
-   - **External:** Public IP, port 80
-   - **Internal:** Server's local IP (e.g., WiFi IP if using WiFi), port 80
-   - **Protocol:** TCP
-
-3. ✅ **Firewall:** Port 80 must be open (we'll configure UFW in Step 1.9)
+**Prerequisites:**
+1. ✅ **DNS:** Your domain must be managed by a DNS provider
+2. ✅ **Access:** Ability to create TXT records in your DNS
 
 **Get Certificate:**
 
 ```bash
 # Install Certbot
-sudo apt install -y certbot python3-certbot-nginx
+sudo apt install -y certbot
 
-# Get certificate (replace YOUR_DOMAIN)
-# Example: sudo certbot certonly --standalone -d cameras.example.com
-sudo certbot certonly --standalone -d YOUR_DOMAIN
+# Get certificate using DNS-01 challenge (replace YOUR_DOMAIN)
+# Example: sudo certbot certonly --manual --preferred-challenges dns -d cameras.example.com
+sudo certbot certonly --manual --preferred-challenges dns -d YOUR_DOMAIN
 
 # Follow prompts:
-# - Enter your email
-# - Agree to terms
-# - Choose not to share email (N)
+# 1. Enter your email
+# 2. Agree to terms
+# 3. Certbot will show you a TXT record to create
+# 4. Create the DNS TXT record: _acme-challenge.YOUR_DOMAIN
+# 5. Wait for DNS to propagate (30-60 seconds)
+# 6. Press Enter to continue
 
 # Verify certificate
 sudo certbot certificates
 ```
 
-**Troubleshooting:**
-- If certbot fails with "port 80 already in use" → Check nothing is running on port 80: `ss -tulpn | grep :80`
-- If certbot fails with "connection refused" → Verify router port forwarding is set up correctly
+**Example DNS TXT Record:**
+```
+Name: _acme-challenge.cameras.example.com
+Type: TXT
+Value: ABC123xyz... (provided by certbot)
+TTL: 300
+```
+
+**Renewal (every 90 days):**
+- Certbot will email you 30 days before expiry
+- Run the same command again and update DNS TXT record
+- Certificate renewal is manual (takes 2 minutes)
 
 **Certificates installed at:**
 - `/etc/letsencrypt/live/YOUR_DOMAIN/fullchain.pem`
 - `/etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem`
 
-### Step 1.7: Configure Nginx Reverse Proxy
+**Note:** Nginx is **NOT needed** for this setup. Dashboard runs directly on port 5000 with HTTPS.
 
-```bash
-# Create site configuration
-sudo nano /etc/nginx/sites-available/camera-platform
-```
-
-**Paste this** (replace YOUR_DOMAIN):
-
-```nginx
-# HTTP - redirect to HTTPS
-server {
-    listen 80;
-    server_name YOUR_DOMAIN;
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/html;
-    }
-
-    location / {
-        return 301 https://$server_name$request_uri;
-    }
-}
-
-# HTTPS
-server {
-    listen 443 ssl http2;
-    server_name YOUR_DOMAIN;
-
-    ssl_certificate /etc/letsencrypt/live/YOUR_DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem;
-    
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-
-    # Dashboard
-    location / {
-        proxy_pass http://localhost:5000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-```bash
-# Enable site
-sudo ln -s /etc/nginx/sites-available/camera-platform /etc/nginx/sites-enabled/
-sudo rm /etc/nginx/sites-enabled/default
-
-# Test configuration
-sudo nginx -t
-
-# Start Nginx
-sudo systemctl enable nginx
-sudo systemctl start nginx
-```
-
-### Step 1.8: Update coturn with SSL Certificates
+### Step 1.6: Update coturn with SSL Certificates
 
 ```bash
 # Edit coturn config
@@ -388,7 +324,7 @@ sudo systemctl enable coturn
 sudo systemctl status coturn
 ```
 
-### Step 1.9: Configure Firewall
+### Step 1.7: Configure Firewall
 
 ```bash
 # Enable UFW
@@ -397,13 +333,11 @@ sudo ufw enable
 # SSH (adjust port if changed)
 sudo ufw allow 22/tcp
 
-# HTTP/HTTPS (web dashboard)
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
+# Dashboard (HTTPS access)
+sudo ufw allow 5000/tcp
 
-# Config server (cameras get certificates on local IP:80)
-# Note: No firewall rule needed - cameras use local network only
-# sudo ufw allow 80/tcp is already set above for Nginx/Let's Encrypt
+# Config server (cameras connect locally - no external access needed)
+# Note: Port 80 is for local network only, no firewall rule needed
 
 # EMQX MQTT
 sudo ufw allow 8883/tcp
@@ -427,18 +361,23 @@ sudo ufw status verbose
 
 ## Part 2: Platform Setup
 
-**Port Architecture Overview:**
-- **Port 80:**
-  - Nginx listens on `0.0.0.0:80` for **domain** (Let's Encrypt + HTTP→HTTPS redirect)
-  - Config server listens on `LOCAL_IP:80` for **IP address** (cameras get certificates)
-  - **No conflict** - different bind addresses!
-- **Port 443:** Nginx (HTTPS) → Dashboard (port 5000)
-- **Port 8883:** EMQX MQTT broker
+**Port Architecture Overview (No Nginx - Direct Access):**
+- **Port 80:** Config server (HTTPS, self-signed)
+  - Cameras connect via local IP: `https://192.168.x.x:80`
+  - Camera certificate provisioning and MQTT config
 
-This architecture allows:
-- External users → `cameras.pahwa.net:80/443` → Nginx → Dashboard
-- Cameras → `192.168.x.x:80` → Config server → Certificates and config
-- Both services coexist on port 80 by binding to different addresses
+- **Port 5000:** Dashboard (HTTPS, Let's Encrypt)
+  - External access: `https://cameras.pahwa.net:5000`
+  - WebRTC livestreaming, event history, camera control
+
+- **Port 8883:** EMQX MQTT broker
+  - Local cameras connect for telemetry and commands
+
+**This architecture is simpler:**
+- No reverse proxy needed
+- Dashboard handles SSL directly
+- Let's Encrypt uses DNS-01 (no port conflicts)
+- Direct port forwarding: External:5000 → Internal:5000
 
 ---
 
@@ -543,7 +482,7 @@ dashboard_server:   Running (PID: XXXXX)
 
 ```bash
 # Test dashboard (from your laptop)
-https://YOUR_DOMAIN
+https://YOUR_DOMAIN:5000
 
 # Login with credentials from .env:
 # Username: admin
@@ -706,6 +645,8 @@ https://YOUR_DOMAIN
 - Message shows camera name, type, and timestamp
 
 ### Check 6: Test Livestream
+
+**Access dashboard:** `https://YOUR_DOMAIN:5000`
 
 **In dashboard:**
 1. Click on camera name

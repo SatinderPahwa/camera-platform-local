@@ -336,9 +336,14 @@ TELEGRAM_NOTIFY_SOUND=false
 # ============================================================================
 # Dashboard Configuration
 # ============================================================================
-DASHBOARD_SERVER_HOST=0.0.0.0
+DASHBOARD_SERVER_HOST={self.config['local_ip']}
 DASHBOARD_SERVER_PORT=5000
 DASHBOARD_URL=https://{self.config['domain']}:5000
+
+# Dashboard SSL Configuration (Let's Encrypt certificates)
+# Update these paths after running certbot
+DASHBOARD_SSL_CERT_FILE=/etc/letsencrypt/live/{self.config['domain']}/fullchain.pem
+DASHBOARD_SSL_KEY_FILE=/etc/letsencrypt/live/{self.config['domain']}/privkey.pem
 
 FLASK_SECRET_KEY={self.config['flask_secret']}
 ADMIN_USERNAME={self.config['admin_username']}
@@ -354,6 +359,13 @@ GOOGLE_CLIENT_SECRET={self.config.get('google_client_secret', '')}
 TURN_SERVER_URL={self.config['turn_url']}
 TURN_SERVER_USERNAME={self.config['turn_username']}
 TURN_SERVER_PASSWORD={self.config['turn_password']}
+
+# ============================================================================
+# SSL Certificates
+# ============================================================================
+# Config Server SSL (self-signed for cameras)
+CONFIG_SSL_CERT_FILE=certificates/broker.crt
+CONFIG_SSL_KEY_FILE=certificates/broker.key
 
 # ============================================================================
 # Database Configuration
