@@ -404,7 +404,7 @@ DEBUG=false
 ## Generated: {datetime.now().isoformat()}
 
 node.name = emqx@127.0.0.1
-node.cookie = {secrets.token_hex(32)}
+node.cookie = "{secrets.token_hex(32)}"
 node.data_dir = data
 
 ## Cluster Configuration
@@ -470,7 +470,7 @@ dashboard {{
     enable = true
   }}
   default_username = admin
-  default_password = {secrets.token_urlsafe(16)}
+  default_password = "{secrets.token_urlsafe(16)}"
 }}
 
 ## Retained Messages
