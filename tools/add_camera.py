@@ -16,6 +16,8 @@ This script:
 import sys
 import hashlib
 import shutil
+import sqlite3
+import socket
 from pathlib import Path
 
 # Add config to path
@@ -26,6 +28,35 @@ try:
 except ImportError:
     PROJECT_ROOT = Path(__file__).parent.parent
     CERT_BASE_DIR = PROJECT_ROOT / 'certificates'
+
+def get_local_ip():
+    """Auto-detect server IP address"""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return None
+
+def create_camera_database(template_path, output_path, server_ip, server_port=8443):
+    """Create camera database from template with server configuration"""
+    shutil.copy(template_path, output_path)
+
+    conn = sqlite3.connect(output_path)
+    cursor = conn.cursor()
+
+    config_srv_host = f"{server_ip}:{server_port}"
+    cursor.execute("UPDATE serverConf SET configSrvHost = ? WHERE ID = 1", (config_srv_host,))
+
+    cursor.execute("SELECT configSrvHost FROM serverConf WHERE ID = 1")
+    result = cursor.fetchone()
+
+    conn.commit()
+    conn.close()
+
+    return result[0] if result else None
 
 def calculate_checksum(file_path):
     """Calculate MD5 checksum of a file"""
@@ -52,6 +83,19 @@ def add_camera(camera_id=None):
         print("❌ Invalid camera ID format. Must be 32 hexadecimal characters.")
         sys.exit(1)
 
+    # Get server IP
+    detected_ip = get_local_ip()
+    if detected_ip:
+        server_ip = input(f"Server IP [{detected_ip}]: ").strip() or detected_ip
+    else:
+        server_ip = input("Server IP: ").strip()
+
+    if not server_ip:
+        print("❌ Server IP is required")
+        sys.exit(1)
+
+    print()
+
     # Check if certificates exist
     ca_cert = CERT_BASE_DIR / 'ca.crt'
     client_cert = CERT_BASE_DIR / 'camera_client.crt'
@@ -65,7 +109,15 @@ def add_camera(camera_id=None):
         print("   python3 setup_platform.py")
         sys.exit(1)
 
-    print(f"✅ Found EMQX certificates at {CERT_BASE_DIR}")
+    print(f"✅ Found EMQX certificates")
+
+    # Check if database template exists
+    db_template = PROJECT_ROOT / 'templates' / 'master_ctrl.db.template'
+    if not db_template.exists():
+        print(f"❌ Database template not found: {db_template}")
+        sys.exit(1)
+
+    print(f"✅ Found database template")
     print()
 
     # Create camera_files directory
@@ -91,10 +143,25 @@ def add_camera(camera_id=None):
     shutil.copy(client_key, camera_files_dir / 'mqtt.key')
     print(f"   ✓ mqtt.key")
 
+    print()
+
+    # Create camera database from template
+    print("📝 Creating camera database...")
+    try:
+        output_db = camera_files_dir / 'master_ctrl.db'
+        config_value = create_camera_database(db_template, output_db, server_ip, 8443)
+        print(f"   ✓ master_ctrl.db (configSrvHost: {config_value})")
+    except Exception as e:
+        print(f"   ❌ Failed to create database: {e}")
+        sys.exit(1)
+
+    print()
+
     # Generate checksums
+    print("🔐 Generating checksums...")
     checksums_file = camera_files_dir / 'checksums.txt'
     with open(checksums_file, 'w') as f:
-        for filename in ['mqttCA.crt', 'mqtt.pem', 'mqtt.key']:
+        for filename in ['mqttCA.crt', 'mqtt.pem', 'mqtt.key', 'master_ctrl.db']:
             file_path = camera_files_dir / filename
             checksum = calculate_checksum(file_path)
             f.write(f"{checksum}  {filename}\n")
@@ -110,26 +177,33 @@ def add_camera(camera_id=None):
     print("📤 Deployment Instructions:")
     print("=" * 60)
     print()
-    print("1. Connect to camera via FTP:")
-    print(f"   ftp <camera_ip>")
-    print(f"   Username: root")
-    print(f"   Password: <your_camera_password>")
+    print("1. Install lftp on server (if not already installed):")
+    print(f"   sudo apt install lftp")
     print()
-    print("2. Upload certificates to /root/certs/ on camera:")
+    print("2. Connect to camera via FTP and upload files:")
     print(f"   cd {camera_files_dir}")
-    print(f"   put mqttCA.crt /root/certs/mqttCA.crt")
-    print(f"   put mqtt.pem /root/certs/mqtt.pem")
-    print(f"   put mqtt.key /root/certs/mqtt.key")
+    print(f"   lftp -u root,<camera_password> <camera_ip>")
     print()
-    print("3. Update camera configuration database:")
-    print(f"   Set configSrvHost to your server IP/domain")
+    print("3. Inside lftp session:")
+    print(f"   cd /root/certs")
+    print(f"   put mqttCA.crt")
+    print(f"   put mqtt.pem")
+    print(f"   put mqtt.key")
+    print(f"   cd /cali")
+    print(f"   put master_ctrl.db")
+    print(f"   quit")
     print()
-    print("4. Reboot camera to apply changes")
+    print("4. Append CA certificate to trusted bundle (via telnet/ssh):")
+    print(f"   telnet <camera_ip>")
+    print(f"   cat /root/certs/mqttCA.crt >> /etc/ssl/certs/ca-bundle.trust.crt")
     print()
-    print("5. Verify connection:")
-    print(f"   - Check EMQX dashboard: http://localhost:18083")
+    print("5. Reboot camera:")
+    print(f"   reboot")
+    print()
+    print("6. Verify connection:")
+    print(f"   - Check EMQX dashboard: http://{server_ip}:18083")
     print(f"   - Check processor logs: tail -f logs/mqtt_processor.log")
-    print(f"   - Check dashboard: http://localhost:5000")
+    print(f"   - Check dashboard: https://{server_ip}")
     print()
 
 def main():
