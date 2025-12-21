@@ -19,8 +19,8 @@ Proactive monitoring that checks all critical services every 12 minutes and rest
 
 ### What is Monitored:
 
-1. **Config Server (Port 8443)** - 5-second timeout check
-   - Tests: `https://192.168.199.218:8443/health`
+1. **Config Server (Port 80)** - 5-second timeout check
+   - Tests: `https://192.168.199.218:80/health`
    - Restarts ALL services if not responding
 
 2. **Dashboard Server (Port 5000)** - 5-second timeout check
@@ -49,7 +49,7 @@ Proactive monitoring that checks all critical services every 12 minutes and rest
 
 7. **CLOSE-WAIT Connection Leak** - Threshold: 5 connections
    - Monitors dashboard port 5000: `ss -tn | grep ":5000" | grep CLOSE-WAIT`
-   - Monitors config server port 8443: `ss -tn | grep ":8443" | grep CLOSE-WAIT`
+   - Monitors config server port 80: `ss -tn | grep ":80" | grep CLOSE-WAIT`
    - Restarts ALL services if leak detected on either port
 
 ### Log Location:
@@ -329,7 +329,7 @@ ps -p $(cat /home/satinder/camera-platform-local/pids/dashboard_server.pid) -o l
 ss -tn | grep ':5000' | grep -c 'CLOSE-WAIT'
 
 # Count CLOSE-WAIT on config server port
-ss -tn | grep ':8443' | grep -c 'CLOSE-WAIT'
+ss -tn | grep ':80' | grep -c 'CLOSE-WAIT'
 
 # Should return 0 or very low number after restart
 ```
@@ -342,7 +342,7 @@ To monitor server health between checks:
 watch -n 60 'ss -tn | grep ":5000" | grep CLOSE-WAIT | wc -l'
 
 # Check connection states (config server)
-watch -n 60 'ss -tn | grep ":8443" | grep CLOSE-WAIT | wc -l'
+watch -n 60 'ss -tn | grep ":80" | grep CLOSE-WAIT | wc -l'
 
 # Check server status
 ./scripts/managed_status.sh
@@ -352,7 +352,7 @@ sudo emqx ctl status
 sudo emqx ctl listeners
 
 # Check ports
-sudo ss -tlnp | grep -E ':(5000|8443|8883|3478|5349|8888)'
+sudo ss -tlnp | grep -E ':(5000|80|8883|3478|5349|8888)'
 ```
 
 ## Troubleshooting
@@ -380,7 +380,7 @@ sudo ss -tlnp | grep -E ':(5000|8443|8883|3478|5349|8888)'
 | Feature | AWS IoT Version | EMQX Version |
 |---------|----------------|--------------|
 | **MQTT Broker** | Custom bridge to AWS IoT Core | EMQX on port 8883 |
-| **Config Server Port** | 80 | 8443 |
+| **Config Server Port** | 80 | 80 (same!) |
 | **Livestreaming** | Kurento via Podman | Kurento via Docker |
 | **Podman Environment** | Required XDG_RUNTIME_DIR | Not needed (Docker) |
 | **Systemd Dependencies** | network.target only | emqx.service + docker.service |

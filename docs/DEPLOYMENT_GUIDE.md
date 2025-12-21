@@ -57,10 +57,10 @@ Before starting, have these ready:
 - Port 49152-65535 (UDP) - TURN relay ports
 
 **NOT needed (local network only):**
-- Port 8443 - Config server (cameras connect locally)
+- Port 80 (IP address) - Config server (cameras connect to local IP, not domain)
 - Port 8883 - EMQX MQTT (cameras connect locally)
 
-**Note:** Port 8443 forwarding is only needed if cameras are located outside your local network.
+**Note:** Port 80 forwarding is only needed if cameras are located outside your local network. Cameras connect to the server's **local IP address** on port 80, while external users connect to the **domain name** on port 80→443. There is no conflict because Nginx listens on `0.0.0.0:80` for the domain, and the config server listens on `LOCAL_IP:80` (specific IP binding).
 
 ---
 
@@ -401,8 +401,9 @@ sudo ufw allow 22/tcp
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 
-# Config server (cameras get certificates)
-sudo ufw allow 8443/tcp
+# Config server (cameras get certificates on local IP:80)
+# Note: No firewall rule needed - cameras use local network only
+# sudo ufw allow 80/tcp is already set above for Nginx/Let's Encrypt
 
 # EMQX MQTT
 sudo ufw allow 8883/tcp
@@ -427,12 +428,17 @@ sudo ufw status verbose
 ## Part 2: Platform Setup
 
 **Port Architecture Overview:**
-- **Port 80:** Nginx (HTTP redirect to HTTPS)
+- **Port 80:**
+  - Nginx listens on `0.0.0.0:80` for **domain** (Let's Encrypt + HTTP→HTTPS redirect)
+  - Config server listens on `LOCAL_IP:80` for **IP address** (cameras get certificates)
+  - **No conflict** - different bind addresses!
 - **Port 443:** Nginx (HTTPS) → Dashboard (port 5000)
-- **Port 8443:** Config server (HTTPS, self-signed) - Cameras get certificates here
 - **Port 8883:** EMQX MQTT broker
 
-This separation allows Nginx to handle secure web access while the config server operates independently for camera certificate provisioning.
+This architecture allows:
+- External users → `cameras.pahwa.net:80/443` → Nginx → Dashboard
+- Cameras → `192.168.x.x:80` → Config server → Certificates and config
+- Both services coexist on port 80 by binding to different addresses
 
 ---
 
@@ -619,7 +625,7 @@ tail -100 /etc/ssl/certs/ca-bundle.trust.crt | grep "BEGIN CERTIFICATE"
 
 **Why both certificates are needed:**
 - `mqttCA.crt` - For MQTT broker connection (port 8883)
-- `config-ca.crt` - For config server HTTPS connection (port 8443)
+- `config-ca.crt` - For config server HTTPS connection (port 80)
 
 **Note:** The database (master_ctrl.db) is already configured with the correct server IP by add_camera.py
 

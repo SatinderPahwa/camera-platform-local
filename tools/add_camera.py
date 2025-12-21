@@ -40,7 +40,7 @@ def get_local_ip():
     except Exception:
         return None
 
-def create_camera_database(template_path, output_path, server_ip, server_port=8443):
+def create_camera_database(template_path, output_path, server_ip, server_port=80):
     """Create camera database from template with server configuration"""
     shutil.copy(template_path, output_path)
 
@@ -157,7 +157,7 @@ def add_camera(camera_id=None):
     print("📝 Creating camera database...")
     try:
         output_db = camera_files_dir / 'master_ctrl.db'
-        config_value = create_camera_database(db_template, output_db, server_ip, 8443)
+        config_value = create_camera_database(db_template, output_db, server_ip, 80)
         print(f"   ✓ master_ctrl.db (configSrvHost: {config_value})")
     except Exception as e:
         print(f"   ❌ Failed to create database: {e}")

@@ -14,7 +14,7 @@ TIMEOUT_SECONDS=5
 MAX_CLOSE_WAIT=5
 
 # Service endpoints and ports
-CONFIG_SERVER_URL="https://localhost:8443/health"
+CONFIG_SERVER_URL="https://localhost:80/health"
 DASHBOARD_SERVER_URL="http://localhost:5000"
 
 # Function to log with timestamp
@@ -44,7 +44,7 @@ log "=== Health Check Started ==="
 ISSUES_FOUND=false
 ISSUE_REASON=""
 
-# Check 1: Config Server (port 8443)
+# Check 1: Config Server (port 80)
 if timeout "$TIMEOUT_SECONDS" curl -k -s "$CONFIG_SERVER_URL" > /dev/null 2>&1; then
     log "✅ Config server responding"
 else
@@ -143,8 +143,8 @@ else
     log "✅ CLOSE-WAIT connections OK ($CLOSE_WAIT_COUNT)"
 fi
 
-# Check 10: CLOSE-WAIT on config server (port 8443)
-CONFIG_CLOSE_WAIT=$(ss -tn 2>/dev/null | grep ":8443" | grep "CLOSE-WAIT" | wc -l)
+# Check 10: CLOSE-WAIT on config server (port 80)
+CONFIG_CLOSE_WAIT=$(ss -tn 2>/dev/null | grep ":80" | grep "CLOSE-WAIT" | wc -l)
 if [ "$CONFIG_CLOSE_WAIT" -ge "$MAX_CLOSE_WAIT" ]; then
     log "❌ Config server CLOSE-WAIT threshold exceeded ($CONFIG_CLOSE_WAIT connections)"
     ISSUES_FOUND=true

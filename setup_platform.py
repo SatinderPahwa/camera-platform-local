@@ -310,7 +310,7 @@ extendedKeyUsage = clientAuth
 EMQX_BROKER_ENDPOINT={self.config['domain']}
 EMQX_BROKER_PORT=8883
 CONFIG_SERVER_HOST={self.config['local_ip']}
-CONFIG_SERVER_PORT=8443
+CONFIG_SERVER_PORT=80
 
 # ============================================================================
 # MQTT Configuration
