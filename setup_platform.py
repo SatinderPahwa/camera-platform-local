@@ -168,11 +168,12 @@ class PlatformSetup:
                 'openssl', 'genrsa', '-out', 'broker.key', '2048'
             ], check=True, capture_output=True)
 
+            # Use local IP as CN for local deployments (cameras connect via IP, not domain)
             subprocess.run([
                 'openssl', 'req', '-new',
                 '-key', 'broker.key',
                 '-out', 'broker.csr',
-                '-subj', f'/C=UK/ST=London/L=London/O=Camera Platform/OU=MQTT Broker/CN={self.config["domain"]}'
+                '-subj', f'/C=UK/ST=London/L=London/O=Camera Platform/OU=Config Server/CN={self.config["local_ip"]}'
             ], check=True, capture_output=True)
 
             # Create extensions file for SAN
