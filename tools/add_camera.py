@@ -127,17 +127,24 @@ def add_camera(camera_id=None):
     # Copy and rename certificates for camera
     print("📦 Creating camera certificate package...")
 
-    # Copy MQTT CA certificate
-    shutil.copy(ca_cert, camera_files_dir / 'mqttCA.crt')
-    print(f"   ✓ mqttCA.crt (for MQTT broker)")
-
-    # Copy config server CA certificate (for HTTPS config server validation)
-    config_ca_cert = CERT_BASE_DIR / 'ca.crt'
-    if config_ca_cert.exists():
-        shutil.copy(config_ca_cert, camera_files_dir / 'config-ca.crt')
-        print(f"   ✓ config-ca.crt (for config server)")
+    # Copy template MQTT CA certificate (contains VeriSign + Config Server CA)
+    template_dir = CERT_BASE_DIR / 'templates'
+    template_mqtt_ca = template_dir / 'mqttCA.template.crt'
+    if template_mqtt_ca.exists():
+        shutil.copy(template_mqtt_ca, camera_files_dir / 'mqttCA.crt')
+        print(f"   ✓ mqttCA.crt (VeriSign + Config Server CA)")
     else:
-        print(f"   ⚠️  Config server CA not found at {config_ca_cert}")
+        # Fallback to single CA if template doesn't exist
+        shutil.copy(ca_cert, camera_files_dir / 'mqttCA.crt')
+        print(f"   ⚠️  Using single CA (template not found)")
+
+    # Copy template CA bundle for /etc/ssl/certs
+    template_ca_bundle = template_dir / 'ca-bundle.trust.template.crt'
+    if template_ca_bundle.exists():
+        shutil.copy(template_ca_bundle, camera_files_dir / 'ca-bundle.trust.crt')
+        print(f"   ✓ ca-bundle.trust.crt (complete CA bundle)")
+    else:
+        print(f"   ⚠️  ca-bundle.trust.template.crt not found")
 
     # Combine client cert and key into mqtt.pem (camera expects PEM format)
     with open(camera_files_dir / 'mqtt.pem', 'w') as outfile:
@@ -169,7 +176,7 @@ def add_camera(camera_id=None):
     print("🔐 Generating checksums...")
     checksums_file = camera_files_dir / 'checksums.txt'
     with open(checksums_file, 'w') as f:
-        for filename in ['mqttCA.crt', 'config-ca.crt', 'mqtt.pem', 'mqtt.key', 'master_ctrl.db']:
+        for filename in ['mqttCA.crt', 'ca-bundle.trust.crt', 'mqtt.pem', 'mqtt.key', 'master_ctrl.db']:
             file_path = camera_files_dir / filename
             if file_path.exists():
                 checksum = calculate_checksum(file_path)
@@ -194,25 +201,28 @@ def add_camera(camera_id=None):
     print(f"   lftp -u root,<camera_password> <camera_ip>")
     print()
     print("3. Inside lftp session:")
+    print(f"   # Upload to /root/certs")
     print(f"   cd /root/certs")
-    print(f"   put mqttCA.crt")
-    print(f"   put config-ca.crt")
     print(f"   put mqtt.pem")
     print(f"   put mqtt.key")
+    print(f"   ")
+    print(f"   # Upload to /cali/certs")
+    print(f"   cd /cali/certs")
+    print(f"   put mqttCA.crt")
+    print(f"   ")
+    print(f"   # Upload to /cali")
     print(f"   cd /cali")
     print(f"   put master_ctrl.db")
+    print(f"   ")
+    print(f"   # Upload to /etc/ssl/certs (overwrites existing)")
+    print(f"   cd /etc/ssl/certs")
+    print(f"   put ca-bundle.trust.crt")
     print(f"   quit")
     print()
-    print("4. Append CA certificates to trusted bundle (via telnet/ssh):")
-    print(f"   telnet <camera_ip>")
-    print(f"   # Login: root/<camera_password>")
-    print(f"   cat /root/certs/mqttCA.crt >> /etc/ssl/certs/ca-bundle.trust.crt")
-    print(f"   cat /root/certs/config-ca.crt >> /etc/ssl/certs/ca-bundle.trust.crt")
-    print()
-    print("5. Reboot camera:")
+    print("4. Reboot camera (via telnet/ssh):")
     print(f"   reboot")
     print()
-    print("6. Verify connection:")
+    print("5. Verify connection:")
     print(f"   - Check EMQX dashboard: http://{server_ip}:18083")
     print(f"   - Check processor logs: tail -f logs/mqtt_processor.log")
     print(f"   - Check dashboard: https://{server_ip}")

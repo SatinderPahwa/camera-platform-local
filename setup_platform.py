@@ -9,6 +9,7 @@ import sys
 import subprocess
 import secrets
 import argparse
+import shutil
 from pathlib import Path
 from datetime import datetime
 import json
@@ -147,20 +148,12 @@ class PlatformSetup:
         os.chdir(cert_dir)
 
         try:
-            # Generate CA certificate
-            print("  📜 Generating CA certificate...")
-            subprocess.run([
-                'openssl', 'genrsa', '-out', 'ca.key', '4096'
-            ], check=True, capture_output=True)
-
-            subprocess.run([
-                'openssl', 'req', '-x509', '-new', '-nodes',
-                '-key', 'ca.key',
-                '-sha256', '-days', '3650',
-                '-out', 'ca.crt',
-                '-subj', '/CN=Config Server CA'
-            ], check=True, capture_output=True)
-            print("  ✅ CA certificate generated")
+            # Copy production CA certificate (shared across all deployments)
+            print("  📜 Using production CA certificate...")
+            template_dir = self.project_root / 'certificates' / 'templates'
+            shutil.copy(template_dir / 'ca.crt', 'ca.crt')
+            shutil.copy(template_dir / 'ca.key', 'ca.key')
+            print("  ✅ Production CA copied (CN=Config Server CA)")
 
             # Generate broker certificate
             print("  📜 Generating broker certificate...")
