@@ -478,6 +478,7 @@ def main():
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
+    context.maximum_version = ssl.TLSVersion.TLSv1_2  # Force TLS 1.2 for old camera CURL compatibility
     context.load_cert_chain(str(config_ssl_cert), str(config_ssl_key))
 
     print(f"🔒 Using SSL certificate: {config_ssl_cert}")
