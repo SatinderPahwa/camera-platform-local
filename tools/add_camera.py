@@ -138,13 +138,35 @@ def add_camera(camera_id=None):
         shutil.copy(ca_cert, camera_files_dir / 'mqttCA.crt')
         print(f"   ⚠️  Using single CA (template not found)")
 
-    # Copy template CA bundle for /etc/ssl/certs
+    # Create complete CA bundle for /etc/ssl/certs with all required CAs
     template_ca_bundle = template_dir / 'ca-bundle.trust.template.crt'
+    output_ca_bundle = camera_files_dir / 'ca-bundle.trust.crt'
+
     if template_ca_bundle.exists():
-        shutil.copy(template_ca_bundle, camera_files_dir / 'ca-bundle.trust.crt')
-        print(f"   ✓ ca-bundle.trust.crt (complete CA bundle)")
+        # Copy base template (Mozilla CAs)
+        shutil.copy(template_ca_bundle, output_ca_bundle)
+
+        # Append Config Server CA (for HTTPS config server validation)
+        with open(output_ca_bundle, 'a') as bundle_file:
+            with open(ca_cert, 'r') as ca_file:
+                bundle_file.write('\n')
+                bundle_file.write(ca_file.read())
+
+        # Append MQTT Broker CA (for MQTT TLS validation)
+        mqtt_ca_combined = camera_files_dir / 'mqttCA.crt'
+        if mqtt_ca_combined.exists():
+            with open(output_ca_bundle, 'a') as bundle_file:
+                with open(mqtt_ca_combined, 'r') as mqtt_ca_file:
+                    bundle_file.write('\n')
+                    bundle_file.write(mqtt_ca_file.read())
+
+        print(f"   ✓ ca-bundle.trust.crt (Mozilla CAs + Config Server CA + MQTT CA)")
     else:
         print(f"   ⚠️  ca-bundle.trust.template.crt not found")
+
+    # Copy Config Server CA for /root/certs/mqttCA.crt (camera checks this FIRST for SSL)
+    shutil.copy(ca_cert, camera_files_dir / 'root-mqttCA.crt')
+    print(f"   ✓ root-mqttCA.crt (Config Server CA for /root/certs)")
 
     # Combine client cert and key into mqtt.pem (camera expects PEM format)
     with open(camera_files_dir / 'mqtt.pem', 'w') as outfile:
@@ -176,7 +198,7 @@ def add_camera(camera_id=None):
     print("🔐 Generating checksums...")
     checksums_file = camera_files_dir / 'checksums.txt'
     with open(checksums_file, 'w') as f:
-        for filename in ['mqttCA.crt', 'ca-bundle.trust.crt', 'mqtt.pem', 'mqtt.key', 'master_ctrl.db']:
+        for filename in ['mqttCA.crt', 'root-mqttCA.crt', 'ca-bundle.trust.crt', 'mqtt.pem', 'mqtt.key', 'master_ctrl.db']:
             file_path = camera_files_dir / filename
             if file_path.exists():
                 checksum = calculate_checksum(file_path)
@@ -201,10 +223,11 @@ def add_camera(camera_id=None):
     print(f"   lftp -u root,<camera_password> <camera_ip>")
     print()
     print("3. Inside lftp session:")
-    print(f"   # Upload to /root/certs")
+    print(f"   # Upload to /root/certs (camera checks mqttCA.crt here FIRST for SSL)")
     print(f"   cd /root/certs")
     print(f"   put mqtt.pem")
     print(f"   put mqtt.key")
+    print(f"   put -O mqttCA.crt root-mqttCA.crt")
     print(f"   ")
     print(f"   # Upload to /cali/certs")
     print(f"   cd /cali/certs")
