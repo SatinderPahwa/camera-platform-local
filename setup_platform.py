@@ -79,6 +79,16 @@ class PlatformSetup:
             self.config['google_client_secret'] = ''
         print()
 
+        # Auto-detect OS Type
+        if sys.platform.startswith('linux'):
+            self.config['os_type'] = 'linux'
+        elif sys.platform == 'darwin':
+            self.config['os_type'] = 'macos'
+        else:
+            self.config['os_type'] = 'linux' # Default for other systems
+        print(f"  ✅ Detected OS: {self.config['os_type']}")
+        print()
+
         # Auto-generate secrets
         print("🔑 Generating secure keys...")
         self.config['flask_secret'] = secrets.token_hex(32)
@@ -438,6 +448,7 @@ LOG_DIR=./logs
 # ============================================================================
 ENVIRONMENT=production
 DEBUG=false
+OS_TYPE={self.config['os_type']}
 """
 
         with open(self.project_root / '.env', 'w') as f:
