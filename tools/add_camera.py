@@ -124,6 +124,9 @@ def add_camera(camera_id=None):
     camera_files_dir = PROJECT_ROOT / 'camera_files' / camera_id
     camera_files_dir.mkdir(parents=True, exist_ok=True)
 
+    # Define the templates directory
+    template_dir = CERT_BASE_DIR / 'templates'
+
     # Copy and rename certificates for camera
     print("📦 Creating camera certificate package...")
 
