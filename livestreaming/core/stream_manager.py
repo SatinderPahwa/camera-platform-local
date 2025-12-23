@@ -378,7 +378,9 @@ class StreamManager:
             "sourceType": "hive-cam",
             "streamId": self.stream_id,
             "sdpOffer": self.sdp_offer,
-        try:
+            "messageType": "play"
+        }
+        try: # <--- This line is where the closing brace should have been
             # Diagnostic logging
             logger.info(f"MQTT Play Command: Client connected = {self.mqtt_client.is_connected()}")
             logger.info(f"MQTT Play Command: Publishing to topic = {topic}")
