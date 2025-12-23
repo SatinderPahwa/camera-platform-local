@@ -1,0 +1,30 @@
+# Kurento WebRTC Endpoint Configuration
+# This file is AUTO-GENERATED from .env by generate_kurento_config.sh
+# DO NOT edit manually - changes will be overwritten
+#
+# Generated: 2025-10-27 22:27:30 UTC
+# Source: /Users/satinder/Documents/_camera_firmware/camera_project/.env
+
+# STUN server configuration
+stunServerAddress=stun.l.google.com
+stunServerPort=19302
+
+# External IP configuration
+# This is the server's LOCAL_IP from .env
+# Kurento will advertise this IP in ICE candidates
+externalIPv4=192.168.199.173
+
+# Network interfaces
+# Auto-detected based on OS_TYPE and LOCAL_IP
+# Specify a single interface to avoid ICE gathering issues on systems with multiple interfaces
+networkInterfaces=all
+
+# ICE candidate gathering timeout (in seconds)
+iceCandidateGatheringTimeout=10
+
+# Port range for WebRTC (from .env: KMS_MIN_PORT - KMS_MAX_PORT)
+minPort=5000
+maxPort=5050
+
+# TURN server (optional - uncomment if needed for restrictive NATs)
+# turnURL=username:password@turn.example.com:3478?transport=udp

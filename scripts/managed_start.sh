@@ -160,6 +160,13 @@ case "$ACTION" in
         start_server "mqtt_processor" "local_mqtt_processor.py"
         start_server "dashboard_server" "dashboard_server.py"
 
+        # Start livestreaming system
+        echo ""
+        echo "Starting livestreaming system..."
+        cd "$PROJECT_DIR/livestreaming"
+        ./start_all.sh
+        cd "$PROJECT_DIR"
+
         echo ""
         echo "======================================"
         echo "Startup Complete"
@@ -175,6 +182,12 @@ case "$ACTION" in
     stop)
         echo "Stopping all servers..."
         echo ""
+
+        # Stop livestreaming system first
+        echo "Stopping livestreaming system..."
+        cd "$PROJECT_DIR/livestreaming"
+        ./stop_all.sh
+        cd "$PROJECT_DIR"
 
         stop_server "dashboard_server"
         stop_server "mqtt_processor"

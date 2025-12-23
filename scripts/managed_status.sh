@@ -56,6 +56,16 @@ check_status "config_server"
 check_status "mqtt_processor"
 check_status "dashboard_server"
 
+# Check livestreaming status
+echo ""
+echo "--------------------------------------"
+echo "Livestreaming Status"
+echo "--------------------------------------"
+cd "$PROJECT_DIR/livestreaming"
+./status.sh
+cd "$PROJECT_DIR"
+
+
 echo ""
 echo "======================================"
 echo "Quick Actions:"

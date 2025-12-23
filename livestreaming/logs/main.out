@@ -1,0 +1,59 @@
+/Users/satinder/Documents/_camera_firmware/camera_project/livestreaming/config/settings.py:244: UserWarning: EXTERNAL_IP is set to example value - update for your deployment
+  warnings.warn("EXTERNAL_IP is set to example value - update for your deployment")
+2025-10-27 22:31:45,614 - __main__ - INFO - ======================================================================
+2025-10-27 22:31:45,614 - __main__ - INFO - Starting Camera Livestreaming Service
+2025-10-27 22:31:45,614 - __main__ - INFO - ======================================================================
+2025-10-27 22:31:45,614 - __main__ - INFO - Validating configuration...
+/Users/satinder/Documents/_camera_firmware/camera_project/livestreaming/config/settings.py:244: UserWarning: EXTERNAL_IP is set to example value - update for your deployment
+  warnings.warn("EXTERNAL_IP is set to example value - update for your deployment")
+2025-10-27 22:31:45,614 - __main__ - INFO - Connecting to Kurento at ws://localhost:8888/kurento...
+2025-10-27 22:31:45,614 - livestreaming.core.kurento_client - INFO - Kurento client initialized for ws://localhost:8888/kurento
+2025-10-27 22:31:45,614 - livestreaming.core.kurento_client - INFO - Connecting to Kurento at ws://localhost:8888/kurento
+2025-10-27 22:31:45,623 - livestreaming.core.kurento_client - INFO - ✅ Connected to Kurento WebSocket
+2025-10-27 22:31:45,625 - livestreaming.core.kurento_client - INFO - 🔍 RAW Kurento message: {
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "value": "pong"
+  }
+}
+2025-10-27 22:31:45,626 - __main__ - INFO - ✅ Kurento connection healthy
+2025-10-27 22:31:45,626 - __main__ - INFO - Creating signaling server...
+2025-10-27 22:31:45,626 - livestreaming.server.signaling_server - INFO - Signaling server initialized on 0.0.0.0:8765
+2025-10-27 22:31:45,626 - livestreaming.server.signaling_server - INFO - ICE candidate relay setup complete
+2025-10-27 22:31:45,626 - livestreaming.server.signaling_server - INFO - Starting signaling server on ws://0.0.0.0:8765
+2025-10-27 22:31:45,627 - websockets.server - INFO - server listening on 0.0.0.0:8765
+2025-10-27 22:31:45,627 - livestreaming.server.signaling_server - INFO - ✅ Signaling server running on ws://0.0.0.0:8765
+2025-10-27 22:31:45,627 - __main__ - INFO - Creating API server...
+2025-10-27 22:31:45,628 - livestreaming.server.api_server - INFO - API server initialized on 0.0.0.0:8080
+2025-10-27 22:31:45,628 - livestreaming.server.api_server - INFO - Starting API server on http://0.0.0.0:8080
+2025-10-27 22:31:45,628 - livestreaming.server.api_server - INFO - ✅ API server running on http://0.0.0.0:8080
+2025-10-27 22:31:45,629 - __main__ - INFO - ======================================================================
+2025-10-27 22:31:45,629 - __main__ - INFO - 🚀 Livestreaming Service Started
+2025-10-27 22:31:45,629 - __main__ - INFO - ======================================================================
+2025-10-27 22:31:45,629 - __main__ - INFO - API Server:       http://0.0.0.0:8080
+2025-10-27 22:31:45,629 - __main__ - INFO - Signaling Server: ws://0.0.0.0:8765
+2025-10-27 22:31:45,629 - __main__ - INFO - Kurento:          ws://localhost:8888/kurento
+2025-10-27 22:31:45,629 - __main__ - INFO - External IP:      86.20.156.73
+2025-10-27 22:31:45,629 - __main__ - INFO - ======================================================================
+2025-10-27 22:31:45,629 - __main__ - INFO - Press Ctrl+C to stop
+2025-10-27 22:31:45,629 - __main__ - INFO - ======================================================================
+2025-10-27 22:31:46,216 - aiohttp.access - INFO - 127.0.0.1 [27/Oct/2025:22:31:46 +0000] "GET /health HTTP/1.1" 200 291 "-" "curl/8.9.1"
+2025-10-27 22:31:46,243 - aiohttp.access - INFO - 127.0.0.1 [27/Oct/2025:22:31:46 +0000] "GET /health HTTP/1.1" 200 291 "-" "curl/8.9.1"
+2025-10-27 22:31:48,311 - aiohttp.access - INFO - 127.0.0.1 [27/Oct/2025:22:31:48 +0000] "GET /health HTTP/1.1" 200 291 "-" "curl/8.9.1"
+2025-10-27 22:31:48,334 - aiohttp.access - INFO - 127.0.0.1 [27/Oct/2025:22:31:48 +0000] "GET /health HTTP/1.1" 200 291 "-" "curl/8.9.1"
+2025-10-27 22:36:59,525 - __main__ - INFO - Received signal 15
+2025-10-27 22:36:59,526 - __main__ - INFO - ======================================================================
+2025-10-27 22:36:59,526 - __main__ - INFO - Stopping Livestreaming Service
+2025-10-27 22:36:59,526 - __main__ - INFO - ======================================================================
+2025-10-27 22:36:59,526 - __main__ - INFO - Stopping API server...
+2025-10-27 22:36:59,526 - livestreaming.server.api_server - INFO - Stopping API server...
+2025-10-27 22:36:59,527 - livestreaming.server.api_server - INFO - ✅ API server stopped
+2025-10-27 22:36:59,527 - __main__ - INFO - Stopping signaling server...
+2025-10-27 22:36:59,527 - livestreaming.server.signaling_server - INFO - Stopping signaling server...
+2025-10-27 22:36:59,527 - websockets.server - INFO - server closing
+2025-10-27 22:36:59,528 - websockets.server - INFO - server closed
+2025-10-27 22:36:59,528 - livestreaming.server.signaling_server - INFO - ✅ Signaling server stopped
+2025-10-27 22:36:59,528 - __main__ - INFO - Closing Kurento connection...
+2025-10-27 22:36:59,528 - livestreaming.core.kurento_client - INFO - Closing Kurento connection
+2025-10-27 22:36:59,529 - __main__ - INFO - ✅ Service stopped
