@@ -61,6 +61,11 @@ class PlatformSetup:
         self.config['turn_password'] = input("  TURN password: ").strip()
         print()
 
+        # File Upload Configuration
+        print("📁 File Upload Configuration")
+        self.config['upload_base_dir'] = input(f"  Base directory for uploads (e.g., /data/uploads) [{self.project_root / 'data/uploads'}]: ").strip() or str(self.project_root / 'data/uploads')
+        print()
+
         # Optional: Google OAuth
         print("🔐 Authentication Configuration")
         setup_oauth = input("  Configure Google OAuth? (y/n) [n]: ").strip().lower()
@@ -407,7 +412,7 @@ DATABASE_PATH=./data/camera_events.db
 # ============================================================================
 # File Upload Configuration
 # ============================================================================
-UPLOAD_BASE_DIR=./data/uploads
+UPLOAD_BASE_DIR={self.config['upload_base_dir']}
 
 # ============================================================================
 # Logging Configuration
