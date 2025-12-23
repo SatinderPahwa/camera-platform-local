@@ -46,6 +46,8 @@ class PlatformSetup:
         print("🌐 Network Configuration")
         self.config['domain'] = input("  External domain name (e.g., camera.pahwa.net): ").strip()
         self.config['local_ip'] = input("  Local server IP (e.g., 192.168.199.173): ").strip()
+        default_prefix = ".".join(self.config['local_ip'].split('.')[:2]) if self.config['local_ip'] else "192.168"
+        self.config['local_prefix'] = input(f"  Local network prefix (e.g., 192.168) [{default_prefix}]: ").strip() or default_prefix
         print()
 
         # Telegram Configuration
@@ -348,6 +350,17 @@ EMQX_BROKER_ENDPOINT={self.config['domain']}
 EMQX_BROKER_PORT=8883
 CONFIG_SERVER_HOST={self.config['local_ip']}
 CONFIG_SERVER_PORT=80
+LOCAL_IP={self.config['local_ip']}
+LOCAL_NETWORK_PREFIX="{self.config['local_prefix']}"
+
+# ============================================================================
+# Kurento Media Server
+# ============================================================================
+KURENTO_WS_URL=ws://localhost:8888/kurento
+KMS_MIN_PORT=5000
+KMS_MAX_PORT=5050
+MAX_VIDEO_RECV_BANDWIDTH=5000
+MIN_VIDEO_RECV_BANDWIDTH=500
 
 # ============================================================================
 # MQTT Configuration
