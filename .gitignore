@@ -118,3 +118,4 @@ node_modules/
 
 # Archive (keep for rollback, but don't commit)
 archive/
+camera_project_old_reference/
