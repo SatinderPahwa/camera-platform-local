@@ -75,59 +75,42 @@ else
     echo -e "${BLUE}   Use './managed_start.sh stop' to stop the main dashboard${NC}"
 fi
 
-# Check if Podman machine is running (macOS) before checking Kurento
-echo ""
-echo "3️⃣  Kurento Media Server..."
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    if ! podman ps >/dev/null 2>&1; then
-        echo -e "${YELLOW}⚠️  Podman machine not running${NC}"
-        echo "Kurento cannot be checked/stopped without Podman machine"
-        echo "Start machine with: podman machine start"
-        echo -e "${YELLOW}Skipping Kurento...${NC}"
-    else
-        # Machine is running, check for Kurento
-        if podman ps --format "{{.Names}}" | grep -q "^kms-production$"; then
-            read -p "Stop Kurento Media Server? (y/n) " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                echo "Stopping Kurento container..."
-                podman stop kms-production
-                echo -e "${GREEN}✅ Kurento stopped${NC}"
+# Detect container runtime
+if command -v podman &> /dev/null; then
+    CONTAINER_CMD="podman"
+elif command -v docker &> /dev/null; then
+    CONTAINER_CMD="docker"
+else
+    echo -e "${YELLOW}No container runtime found, skipping Kurento stop${NC}"
+    CONTAINER_CMD=""
+fi
 
-                read -p "Remove Kurento container? (y/n) " -n 1 -r
-                echo
-                if [[ $REPLY =~ ^[Yy]$ ]]; then
-                    podman rm kms-production
-                    echo -e "${GREEN}✅ Kurento container removed${NC}"
-                fi
-            else
-                echo -e "${YELLOW}Kurento still running${NC}"
-            fi
+# Stop Kurento Media Server
+if [ -n "$CONTAINER_CMD" ]; then
+    echo ""
+    echo "3️⃣  Kurento Media Server..."
+    
+    # Check if Podman machine is running (macOS)
+    if [[ "$OSTYPE" == "darwin"* ]] && [[ "$CONTAINER_CMD" == "podman" ]]; then
+        if ! podman ps >/dev/null 2>&1; then
+            echo -e "${YELLOW}⚠️  Podman machine not running${NC}"
+            echo -e "${YELLOW}Skipping Kurento...${NC}"
+            CONTAINER_CMD=""
+        fi
+    fi
+
+    if [ -n "$CONTAINER_CMD" ]; then
+        if $CONTAINER_CMD ps -a --format "{{.Names}}" | grep -q "^kms-production$"; then
+            echo "Stopping Kurento container..."
+            $CONTAINER_CMD stop kms-production >/dev/null 2>&1 || true
+            echo -e "${GREEN}✅ Kurento stopped${NC}"
+
+            echo "Removing Kurento container..."
+            $CONTAINER_CMD rm kms-production >/dev/null 2>&1 || true
+            echo -e "${GREEN}✅ Kurento container removed${NC}"
         else
             echo -e "${YELLOW}Kurento not running${NC}"
         fi
-    fi
-else
-    # Linux - no machine needed
-    if podman ps --format "{{.Names}}" | grep -q "^kms-production$"; then
-        read -p "Stop Kurento Media Server? (y/n) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo "Stopping Kurento container..."
-            podman stop kms-production
-            echo -e "${GREEN}✅ Kurento stopped${NC}"
-
-            read -p "Remove Kurento container? (y/n) " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                podman rm kms-production
-                echo -e "${GREEN}✅ Kurento container removed${NC}"
-            fi
-        else
-            echo -e "${YELLOW}Kurento still running${NC}"
-        fi
-    else
-        echo -e "${YELLOW}Kurento not running${NC}"
     fi
 fi
 

@@ -16,6 +16,18 @@ WS_PORT=8888
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 CONFIG_DIR="${SCRIPT_DIR}/../config/kurento"
 
+# Detect container runtime
+if command -v podman &> /dev/null; then
+    CONTAINER_CMD="podman"
+    echo "✅ Using Podman"
+elif command -v docker &> /dev/null; then
+    CONTAINER_CMD="docker"
+    echo "✅ Using Docker"
+else
+    echo "❌ No container runtime found (podman or docker)"
+    exit 1
+fi
+
 echo "======================================================================"
 echo "Starting Kurento Media Server for Production Livestreaming"
 echo "======================================================================"
@@ -30,53 +42,56 @@ if [ $? -ne 0 ]; then
 fi
 echo ""
 
-# Check if Podman machine is running
-echo "Step 2: Checking Podman machine status..."
-if ! podman ps >/dev/null 2>&1; then
-    echo "⚠️  Podman machine not running, starting it..."
+# Check if Podman machine is running (only for Podman on macOS)
+if [[ "${CONTAINER_CMD}" == "podman" ]]; then
+    echo "Step 2: Checking Podman machine status..."
+    if ! ${CONTAINER_CMD} ps >/dev/null 2>&1; then
+        echo "⚠️  Podman machine not running, starting it..."
 
-    # Try to start the machine
-    if podman machine start 2>&1 | grep -q "already running"; then
-        echo "✅ Podman machine already running"
-    else
-        echo "✅ Podman machine started"
-        sleep 3  # Give it a moment to initialize
-    fi
+        # Try to start the machine
+        if ${CONTAINER_CMD} machine start 2>&1 | grep -q "already running"; then
+            echo "✅ Podman machine already running"
+        else
+            echo "✅ Podman machine started"
+            sleep 3  # Give it a moment to initialize
+        fi
 
-    # Verify it's now working
-    if ! podman ps >/dev/null 2>&1; then
-        echo "❌ Failed to start Podman machine"
-        echo "   Try manually: podman machine start"
-        exit 1
+        # Verify it's now working
+        if ! ${CONTAINER_CMD} ps >/dev/null 2>&1; then
+            echo "❌ Failed to start Podman machine"
+            echo "   Try manually: podman machine start"
+            exit 1
+        fi
     fi
+    echo "✅ Podman machine is running"
+else
+    echo "Step 2: Container runtime check passed (${CONTAINER_CMD})"
 fi
-
-echo "✅ Podman machine is running"
 echo ""
 
 # Check if container already exists
 echo "Step 3: Starting Kurento container..."
-if podman ps -a --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
+if ${CONTAINER_CMD} ps -a --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
     echo "Container '${CONTAINER_NAME}' already exists."
 
     # Check if it's running
-    if podman ps --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
+    if ${CONTAINER_CMD} ps --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
         echo "✅ Container is already running"
         echo ""
         echo "To view logs:"
-        echo "  podman logs -f ${CONTAINER_NAME}"
+        echo "  ${CONTAINER_CMD} logs -f ${CONTAINER_NAME}"
         echo ""
         echo "To restart:"
-        echo "  podman restart ${CONTAINER_NAME}"
+        echo "  ${CONTAINER_CMD} restart ${CONTAINER_NAME}"
         echo ""
         echo "To stop:"
-        echo "  podman stop ${CONTAINER_NAME}"
+        echo "  ${CONTAINER_CMD} stop ${CONTAINER_NAME}"
         exit 0
     fi
 
     # Container exists but not running - start it
     echo "Starting existing container..."
-    podman start ${CONTAINER_NAME}
+    ${CONTAINER_CMD} start ${CONTAINER_NAME}
     echo "✅ Container started"
 else
     # Create and start new container
@@ -87,7 +102,7 @@ else
         # macOS: use port mapping (--network host doesn't work properly)
         echo "Detected macOS: using port mapping"
         echo "Mounting custom Kurento configuration..."
-        podman run -d \
+        ${CONTAINER_CMD} run -d \
             --name ${CONTAINER_NAME} \
             -p ${WS_PORT}:${WS_PORT} \
             -p ${WS_PORT}:${WS_PORT}/udp \
@@ -101,7 +116,7 @@ else
         # Linux: use host network for better performance
         echo "Detected Linux: using host network"
         echo "Mounting custom Kurento configuration..."
-        podman run -d \
+        ${CONTAINER_CMD} run -d \
             --name ${CONTAINER_NAME} \
             --network host \
             -v "${CONFIG_DIR}/WebRtcEndpoint.conf.ini:/etc/kurento/modules/kurento/WebRtcEndpoint.conf.ini:Z" \
@@ -123,17 +138,17 @@ echo "======================================================================"
 sleep 2
 
 # Check if container is running
-if podman ps --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
+if ${CONTAINER_CMD} ps --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
     echo "Status: Running ✅"
     echo "WebSocket URL: ws://localhost:${WS_PORT}/kurento"
     echo ""
-    echo "Container ID: $(podman ps -q --filter name=${CONTAINER_NAME})"
+    echo "Container ID: $(${CONTAINER_CMD} ps -q --filter name=${CONTAINER_NAME})"
     echo ""
     echo "Useful commands:"
-    echo "  View logs:    podman logs -f ${CONTAINER_NAME}"
-    echo "  Stop:         podman stop ${CONTAINER_NAME}"
-    echo "  Restart:      podman restart ${CONTAINER_NAME}"
-    echo "  Remove:       podman stop ${CONTAINER_NAME} && podman rm ${CONTAINER_NAME}"
+    echo "  View logs:    ${CONTAINER_CMD} logs -f ${CONTAINER_NAME}"
+    echo "  Stop:         ${CONTAINER_CMD} stop ${CONTAINER_NAME}"
+    echo "  Restart:      ${CONTAINER_CMD} restart ${CONTAINER_NAME}"
+    echo "  Remove:       ${CONTAINER_CMD} stop ${CONTAINER_NAME} && ${CONTAINER_CMD} rm ${CONTAINER_NAME}"
     echo ""
     echo "Health check:"
     echo "  curl -s http://localhost:${WS_PORT} | head -5"
@@ -142,7 +157,7 @@ else
     echo "❌ Error: Container failed to start"
     echo ""
     echo "Check logs:"
-    echo "  podman logs ${CONTAINER_NAME}"
+    echo "  ${CONTAINER_CMD} logs ${CONTAINER_NAME}"
     exit 1
 fi
 

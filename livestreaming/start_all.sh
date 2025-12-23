@@ -70,15 +70,21 @@ if ! command_exists python3; then
 fi
 echo -e "${GREEN}✅ Python 3: $(python3 --version)${NC}"
 
-# Check Podman
-if ! command_exists podman; then
-    echo -e "${RED}❌ Podman not found${NC}"
-    echo "   Install: brew install podman"
+# Check Container Runtime (Podman or Docker)
+if command_exists podman; then
+    CONTAINER_CMD="podman"
+    echo -e "${GREEN}✅ Podman: $(podman --version)${NC}"
+elif command_exists docker; then
+    CONTAINER_CMD="docker"
+    echo -e "${GREEN}✅ Docker: $(docker --version)${NC}"
+else
+    echo -e "${RED}❌ No container runtime found${NC}"
+    echo "   Install: brew install podman OR brew install --cask docker"
     exit 1
 fi
 
-# Check if Podman machine is running (macOS)
-if [[ "$OSTYPE" == "darwin"* ]]; then
+# Check if Podman machine is running (macOS only)
+if [[ "$OSTYPE" == "darwin"* ]] && [[ "$CONTAINER_CMD" == "podman" ]]; then
     echo "Checking Podman machine status..."
     if ! podman ps >/dev/null 2>&1; then
         echo -e "${YELLOW}⚠️  Podman machine not running, starting it...${NC}"
@@ -99,8 +105,6 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         fi
     fi
 fi
-
-echo -e "${GREEN}✅ Podman: $(podman --version)${NC}"
 
 # Check EMQX Broker
 echo "Checking EMQX Broker..."
@@ -165,7 +169,7 @@ echo ""
 echo "1️⃣  Starting Kurento Media Server..."
 echo ""
 
-if podman ps --format "{{.Names}}" | grep -q "^kms-production$"; then
+if $CONTAINER_CMD ps --format "{{.Names}}" | grep -q "^kms-production$"; then
     echo -e "${GREEN}✅ Kurento already running${NC}"
 else
     "$SCRIPT_DIR/scripts/start_kurento.sh"
@@ -179,7 +183,7 @@ fi
 sleep 2
 if ! wait_for_service "http://localhost:8888" "Kurento"; then
     echo -e "${RED}❌ Kurento did not start properly${NC}"
-    echo "   Check logs: podman logs kms-production"
+    echo "   Check logs: $CONTAINER_CMD logs kms-production"
     exit 1
 fi
 
@@ -255,7 +259,7 @@ echo ""
 echo "📊 Status:"
 echo "   Health check:  curl http://localhost:8080/health | python3 -m json.tool"
 echo "   List streams:  curl http://localhost:8080/streams | python3 -m json.tool"
-echo "   Kurento logs:  podman logs -f kms-production"
+echo "   Kurento logs:  $CONTAINER_CMD logs -f kms-production"
 echo "   Service logs:  tail -f $SCRIPT_DIR/logs/livestreaming.log"
 echo ""
 echo "🧪 Test with Camera 4:"

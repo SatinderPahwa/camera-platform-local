@@ -17,22 +17,34 @@ echo "📊 Livestreaming System Status"
 echo "========================================================================"
 echo ""
 
+# Detect container runtime
+CONTAINER_CMD=""
+if command -v podman &> /dev/null; then
+    CONTAINER_CMD="podman"
+elif command -v docker &> /dev/null; then
+    CONTAINER_CMD="docker"
+fi
+
 # Check Kurento
 echo "1️⃣  Kurento Media Server"
-if podman ps --format "{{.Names}}" | grep -q "^kms-production$"; then
-    echo -e "   Status: ${GREEN}✅ Running${NC}"
-    CONTAINER_ID=$(podman ps -q --filter name=kms-production)
-    echo "   Container: $CONTAINER_ID"
-    echo "   URL: ws://localhost:8888/kurento"
+if [ -n "$CONTAINER_CMD" ]; then
+    if $CONTAINER_CMD ps --format "{{.Names}}" | grep -q "^kms-production$"; then
+        echo -e "   Status: ${GREEN}✅ Running${NC}"
+        CONTAINER_ID=$($CONTAINER_CMD ps -q --filter name=kms-production)
+        echo "   Container: $CONTAINER_ID"
+        echo "   URL: ws://localhost:8888/kurento"
 
-    # Test connection
-    if curl -s http://localhost:8888 > /dev/null 2>&1; then
-        echo -e "   Connection: ${GREEN}✅ OK${NC}"
+        # Test connection
+        if curl -s http://localhost:8888 > /dev/null 2>&1; then
+            echo -e "   Connection: ${GREEN}✅ OK${NC}"
+        else
+            echo -e "   Connection: ${RED}❌ Failed${NC}"
+        fi
     else
-        echo -e "   Connection: ${RED}❌ Failed${NC}"
+        echo -e "   Status: ${RED}❌ Not running${NC}"
     fi
 else
-    echo -e "   Status: ${RED}❌ Not running${NC}"
+    echo -e "   Status: ${RED}❌ Not running (No container runtime found)${NC}"
 fi
 
 echo ""
@@ -104,7 +116,11 @@ echo ""
 echo "📋 Quick Commands:"
 echo "   View API health:   curl http://localhost:8080/health | python3 -m json.tool"
 echo "   List streams:      curl http://localhost:8080/streams | python3 -m json.tool"
-echo "   Kurento logs:      podman logs -f kms-production"
+if [ -n "$CONTAINER_CMD" ]; then
+    echo "   Kurento logs:      $CONTAINER_CMD logs -f kms-production"
+else
+    echo "   Kurento logs:      Not available (No container runtime found)"
+fi
 echo "   Service logs:      tail -f $SCRIPT_DIR/logs/livestreaming.log"
 echo "   Stop all:          $SCRIPT_DIR/stop_all.sh"
 echo ""
