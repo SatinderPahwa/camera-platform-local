@@ -201,6 +201,45 @@ IP.1 = {self.config['local_ip']}
             os.remove('broker_ext.cnf')
             print("  ✅ Broker certificate generated")
 
+            # Generate config server certificate
+            print("  📜 Generating config server certificate...")
+            subprocess.run([
+                'openssl', 'genrsa', '-out', 'config_server.key', '2048'
+            ], check=True, capture_output=True)
+
+            subprocess.run([
+                'openssl', 'req', '-new',
+                '-key', 'config_server.key',
+                '-out', 'config_server.csr',
+                '-subj', f'/CN={self.config["local_ip"]}'
+            ], check=True, capture_output=True)
+
+            with open('config_server_ext.cnf', 'w') as f:
+                f.write(f"""basicConstraints = CA:FALSE
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+IP.1 = {self.config['local_ip']}
+""")
+
+            subprocess.run([
+                'openssl', 'x509', '-req',
+                '-in', 'config_server.csr',
+                '-CA', 'ca.crt',
+                '-CAkey', 'ca.key',
+                '-CAcreateserial',
+                '-out', 'config_server.crt',
+                '-days', '3650',
+                '-sha256',
+                '-extfile', 'config_server_ext.cnf'
+            ], check=True, capture_output=True)
+
+            os.remove('config_server.csr')
+            os.remove('config_server_ext.cnf')
+            print("  ✅ Config server certificate generated")
+
             # Generate client certificate (shared by all cameras)
             print("  📜 Generating client certificate...")
             subprocess.run([
@@ -357,8 +396,8 @@ TURN_SERVER_PASSWORD={self.config['turn_password']}
 # SSL Certificates
 # ============================================================================
 # Config Server SSL (self-signed for cameras)
-CONFIG_SSL_CERT_FILE=certificates/broker.crt
-CONFIG_SSL_KEY_FILE=certificates/broker.key
+CONFIG_SSL_CERT_FILE=certificates/config_server.crt
+CONFIG_SSL_KEY_FILE=certificates/config_server.key
 
 # ============================================================================
 # Database Configuration

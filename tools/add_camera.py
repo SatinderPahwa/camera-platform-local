@@ -127,46 +127,26 @@ def add_camera(camera_id=None):
     # Copy and rename certificates for camera
     print("📦 Creating camera certificate package...")
 
-    # Copy template MQTT CA certificate (contains VeriSign + Config Server CA)
-    template_dir = CERT_BASE_DIR / 'templates'
-    template_mqtt_ca = template_dir / 'mqttCA.template.crt'
-    if template_mqtt_ca.exists():
-        shutil.copy(template_mqtt_ca, camera_files_dir / 'mqttCA.crt')
-        print(f"   ✓ mqttCA.crt (VeriSign + Config Server CA)")
-    else:
-        # Fallback to single CA if template doesn't exist
-        shutil.copy(ca_cert, camera_files_dir / 'mqttCA.crt')
-        print(f"   ⚠️  Using single CA (template not found)")
-
-    # Create complete CA bundle for /etc/ssl/certs with all required CAs
-    template_ca_bundle = template_dir / 'ca-bundle.trust.template.crt'
-    output_ca_bundle = camera_files_dir / 'ca-bundle.trust.crt'
-
-    if template_ca_bundle.exists():
-        # Copy base template (Mozilla CAs)
-        shutil.copy(template_ca_bundle, output_ca_bundle)
-
-        # Append Config Server CA (for HTTPS config server validation)
-        with open(output_ca_bundle, 'a') as bundle_file:
-            with open(ca_cert, 'r') as ca_file:
-                bundle_file.write('\n')
-                bundle_file.write(ca_file.read())
-
-        # Append MQTT Broker CA (for MQTT TLS validation)
-        mqtt_ca_combined = camera_files_dir / 'mqttCA.crt'
-        if mqtt_ca_combined.exists():
-            with open(output_ca_bundle, 'a') as bundle_file:
-                with open(mqtt_ca_combined, 'r') as mqtt_ca_file:
-                    bundle_file.write('\n')
-                    bundle_file.write(mqtt_ca_file.read())
-
-        print(f"   ✓ ca-bundle.trust.crt (Mozilla CAs + Config Server CA + MQTT CA)")
-    else:
-        print(f"   ⚠️  ca-bundle.trust.template.crt not found")
+    # Copy template MQTT CA certificate (which is our root CA)
+    shutil.copy(ca_cert, camera_files_dir / 'mqttCA.crt')
+    print(f"   ✓ mqttCA.crt (Our Root CA)")
 
     # Copy Config Server CA for /root/certs/mqttCA.crt (camera checks this FIRST for SSL)
     shutil.copy(ca_cert, camera_files_dir / 'root-mqttCA.crt')
     print(f"   ✓ root-mqttCA.crt (Config Server CA for /root/certs)")
+
+    # Create complete CA bundle by appending our root CA to the template
+    template_ca_bundle = template_dir / 'ca-bundle.trust.template.crt'
+    output_ca_bundle = camera_files_dir / 'ca-bundle.trust.crt'
+    if template_ca_bundle.exists():
+        shutil.copy(template_ca_bundle, output_ca_bundle)
+        with open(output_ca_bundle, 'a') as bundle_file:
+            with open(ca_cert, 'r') as ca_file:
+                bundle_file.write('\n# Platform Root CA\n')
+                bundle_file.write(ca_file.read())
+        print(f"   ✓ ca-bundle.trust.crt (template + platform root CA)")
+    else:
+        print(f"   ⚠️  ca-bundle.trust.template.crt not found, bundle not created.")
 
     # Combine client cert and key into mqtt.pem (camera expects PEM format)
     with open(camera_files_dir / 'mqtt.pem', 'w') as outfile:
@@ -223,23 +203,19 @@ def add_camera(camera_id=None):
     print(f"   lftp -u root,<camera_password> <camera_ip>")
     print()
     print("3. Inside lftp session:")
-    print(f"   # Upload to /root/certs (camera checks mqttCA.crt here FIRST for SSL)")
+    print(f"   # Upload CA bundle to system trust store (OVERWRITES a system file)")
+    print(f"   cd /etc/ssl/certs")
+    print(f"   put ca-bundle.trust.crt")
+    print(f"   ")
+    print(f"   # Upload certificates to /root/certs")
     print(f"   cd /root/certs")
     print(f"   put mqtt.pem")
     print(f"   put mqtt.key")
     print(f"   put -O mqttCA.crt root-mqttCA.crt")
     print(f"   ")
-    print(f"   # Upload to /cali/certs")
-    print(f"   cd /cali/certs")
-    print(f"   put mqttCA.crt")
-    print(f"   ")
-    print(f"   # Upload to /cali")
+    print(f"   # Upload database to /cali")
     print(f"   cd /cali")
     print(f"   put master_ctrl.db")
-    print(f"   ")
-    print(f"   # Upload to /etc/ssl/certs (overwrites existing)")
-    print(f"   cd /etc/ssl/certs")
-    print(f"   put ca-bundle.trust.crt")
     print(f"   quit")
     print()
     print("4. Reboot camera (via telnet/ssh):")

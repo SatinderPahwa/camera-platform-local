@@ -507,7 +507,6 @@ python3 tools/add_camera.py 67E48798E70345179A86980A7CAAAE73
 
 **This creates:** `camera_files/YOUR_CAMERA_ID/`
 - `mqttCA.crt` - MQTT broker CA certificate
-- `config-ca.crt` - Config server CA certificate
 - `mqtt.pem` - Client certificate + key
 - `mqtt.key` - Private key
 - `master_ctrl.db` - Camera database with server configuration
@@ -549,24 +548,29 @@ md5sum /root/certs/*
 # Compare checksums with checksums.txt
 ```
 
-### Step 3.3: Append CA Certificates to Trusted Bundle
+### Step 3.3: Deploy Certificates to Camera
 
-**On camera (via SSH/telnet):**
+**Connect via FTP:**
 
 ```bash
-# Append BOTH CA certificates to trusted bundle (required for SSL validation)
-cat /root/certs/mqttCA.crt >> /etc/ssl/certs/ca-bundle.trust.crt
-cat /root/certs/config-ca.crt >> /etc/ssl/certs/ca-bundle.trust.crt
+# From camera_files directory
+cd camera_files/YOUR_CAMERA_ID
 
-# Verify certificates were appended
-tail -100 /etc/ssl/certs/ca-bundle.trust.crt | grep "BEGIN CERTIFICATE"
+# Connect to camera
+ftp YOUR_CAMERA_IP
+# Login: root / YOUR_CAMERA_PASSWORD
+
+# Upload certificate files
+ftp> cd /etc/ssl/certs
+ftp> put ca-bundle.trust.crt
+ftp> cd /root/certs
+ftp> put mqttCA.crt
+ftp> put mqtt.pem
+ftp> put mqtt.key
+ftp> cd /cali
+ftp> put master_ctrl.db
+ftp> quit
 ```
-
-**Why both certificates are needed:**
-- `mqttCA.crt` - For MQTT broker connection (port 8883)
-- `config-ca.crt` - For config server HTTPS connection (port 80)
-
-**Note:** The database (master_ctrl.db) is already configured with the correct server IP by add_camera.py
 
 ### Step 3.4: Reboot Camera
 

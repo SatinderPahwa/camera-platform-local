@@ -458,8 +458,8 @@ def main():
     print()
 
     # Create SSL context using config server certificates
-    config_ssl_cert = os.getenv('CONFIG_SSL_CERT_FILE', 'certificates/broker.crt')
-    config_ssl_key = os.getenv('CONFIG_SSL_KEY_FILE', 'certificates/broker.key')
+    config_ssl_cert = os.getenv('CONFIG_SSL_CERT_FILE', 'certificates/config_server.crt')
+    config_ssl_key = os.getenv('CONFIG_SSL_KEY_FILE', 'certificates/config_server.key')
 
     # Convert to absolute path if relative
     if not os.path.isabs(config_ssl_cert):
