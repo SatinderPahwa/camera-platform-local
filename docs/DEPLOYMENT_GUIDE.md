@@ -407,7 +407,20 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### Step 2.3: Run Setup Wizard
+### Step 2.3: Set File Permissions
+
+To prevent database and file access errors, set the correct ownership and permissions for the project directory.
+
+```bash
+# Grant your user ownership of the entire project directory
+# Replace 'your-user' with your actual username if the command fails
+sudo chown -R $(whoami):$(whoami) .
+
+# Ensure the data, logs, and pids directories are writable
+chmod -R u+w data/ logs/ pids/
+```
+
+### Step 2.4: Run Setup Wizard
 
 The setup wizard will generate certificates and configuration.
 
