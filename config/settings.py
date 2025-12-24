@@ -105,6 +105,13 @@ GOOGLE_CLIENT_ID = get_env('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = get_env('GOOGLE_CLIENT_SECRET', '')
 
 # ============================================================================
+# SSL/TLS Configuration (for HTTPS Dashboard and WSS Signaling)
+# ============================================================================
+DASHBOARD_SSL_ENABLED = get_env('DASHBOARD_SSL_ENABLED', False, bool)
+DASHBOARD_SSL_CERT_FILE = get_env('DASHBOARD_SSL_CERT_FILE', '')
+DASHBOARD_SSL_KEY_FILE = get_env('DASHBOARD_SSL_KEY_FILE', '')
+
+# ============================================================================
 # TURN Server Configuration
 # ============================================================================
 TURN_SERVER_URL = get_env('TURN_SERVER_URL', '')

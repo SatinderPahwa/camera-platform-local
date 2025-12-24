@@ -24,14 +24,29 @@
 
 **Current Issue:**
 - To enable the dashboard server (running as a non-root user) to serve HTTPS, the permissions on the Let's Encrypt private key (`/etc/letsencrypt/live/your.domain/privkey.pem`) were loosened to be world-readable (`644`).
+- **NEW:** The same issue applies to the WebSocket signaling server for WSS (secure WebSocket) support needed for external HTTPS access.
 - This is a significant security risk, as any user on the server can read the private SSL key.
 
-**Recommended Long-Term Solutions (choose one):**
-- **A) Use Gunicorn with `sudo`**: Implement the Gunicorn WSGI server as planned. Gunicorn can be started with `sudo` to read the key and bind to port 5000, and then it can drop privileges to run its worker processes as a non-root user. This is a standard and secure practice.
-- **B) Use a Reverse Proxy (Nginx)**: Set up Nginx as a reverse proxy. Nginx would run as root, handle all HTTPS traffic (reading the certs securely), and forward the decrypted traffic internally to the Flask application running on a high port (e.g., 5001) as a non-root user. This is a very common and secure production architecture.
-- **C) Change Group Ownership**: Change the group ownership of the `/etc/letsencrypt/archive/` and `/etc/letsencrypt/live/` directories to a specific group (e.g., `ssl-certs`), add the `satinder` user to that group, and set directory permissions to `750` and private key permissions to `640`. This is more secure than world-readable but can be complex to manage, especially with Certbot renewals.
+**Affects:**
+- Dashboard server (port 5000, HTTPS)
+- WebSocket signaling server (port 8765, WSS) - **ADDED**
 
-**Status:** A temporary, insecure workaround (`chmod 644`) is in place. A long-term solution needs to be implemented.
+**Constraint:**
+- Config server runs on port 80 (cameras connect here) - **cannot use Nginx on port 80**
+- Dashboard uses port 5000 with direct HTTPS
+- Nginx reverse proxy not viable due to port 80 conflict
+
+**Recommended Long-Term Solutions (choose one):**
+- **A) Change Group Ownership** (RECOMMENDED given port 80 constraint): Change the group ownership of the `/etc/letsencrypt/archive/` and `/etc/letsencrypt/live/` directories to a specific group (e.g., `ssl-certs`), add the `satinder` user to that group, and set directory permissions to `750` and private key permissions to `640`. This is more secure than world-readable. Add automation to handle Certbot renewals.
+- **B) Use Gunicorn with `sudo`**: Implement the Gunicorn WSGI server with sudo start + privilege drop. Gunicorn can be started with `sudo` to read the key, then drop privileges to run worker processes as non-root user.
+- **C) Systemd with CapabilityBoundingSet**: Use systemd service files with `AmbientCapabilities=CAP_NET_BIND_SERVICE` and `ReadOnlyPaths=` to grant specific access to certificates without world-readable permissions.
+
+**Status:** A temporary, insecure workaround (`chmod 644`) is in place. Solution A (group ownership) recommended.
+
+**Security Issue Found in Reference Implementation:**
+- The reference project (`camera-project`) has the same SSL private key permission issue
+- This is a common limitation when running Python services as non-root users
+- Both projects should implement solution A (group ownership) for production given the port 80 constraint
 
 ### 3. Replace Flask Development Server with a Production WSGI Server
 

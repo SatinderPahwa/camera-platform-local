@@ -634,6 +634,123 @@ If you've tried these solutions and still have issues:
    - Search documentation
    - Review commit history for recent fixes
 
+## Livestreaming Issues
+
+### WebSocket Connection Failed (External Access)
+
+**Problem:** When accessing dashboard via HTTPS (e.g., `https://cameras.pahwa.net:5000`), livestreaming fails with:
+```
+❌ Error: WebSocket connection failed
+❌ WebSocket error - Check port 8765 is accessible
+🔌 Connecting to: wss://cameras.pahwa.net:8765
+```
+
+**Root Cause:** Browser security policy requires **WSS** (secure WebSocket) when page is loaded over HTTPS. The signaling server must have SSL certificates configured.
+
+**Solution:**
+
+1. **Configure SSL for signaling server:**
+   ```bash
+   # On production server
+   cd ~/camera-platform-local
+   ./scripts/configure_ssl_signaling.sh
+   ```
+
+2. **Verify .env has SSL configuration:**
+   ```bash
+   grep DASHBOARD_SSL .env
+   # Should show:
+   # DASHBOARD_SSL_ENABLED=true
+   # DASHBOARD_SSL_CERT_FILE=/etc/letsencrypt/live/YOUR_DOMAIN/fullchain.pem
+   # DASHBOARD_SSL_KEY_FILE=/etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem
+   ```
+
+3. **Restart services:**
+   ```bash
+   ./scripts/managed_start.sh restart
+   ```
+
+4. **Verify WSS is enabled:**
+   ```bash
+   tail -f logs/livestreaming.log | grep -i ssl
+   # Should show:
+   # 🔒 Signaling server SSL enabled with certificate: /etc/letsencrypt/live/...
+   # ✅ Signaling server running on wss://0.0.0.0:8765
+   ```
+
+**Port Forwarding Check:**
+
+If WSS is enabled but connection still fails, verify port forwarding:
+```bash
+# From external network, test WebSocket port
+nc -zv YOUR_DOMAIN 8765
+# Should show: Connection succeeded
+```
+
+Add port forwarding rule in router:
+- External port: 8765
+- Internal IP: Your server IP
+- Internal port: 8765
+- Protocol: TCP
+
+**Firewall Check:**
+```bash
+sudo ufw status | grep 8765
+# Should show:
+# 8765/tcp   ALLOW   Anywhere
+```
+
+If not allowed:
+```bash
+sudo ufw allow 8765/tcp
+```
+
+### Livestreaming Works Locally But Not Externally
+
+**Problem:** Stream works on `http://localhost:5000` but fails on `https://cameras.pahwa.net:5000`
+
+**Diagnosis:**
+1. **Check browser console** (F12 → Console tab)
+   - Look for WebSocket connection errors
+   - Check if trying WS or WSS
+
+2. **Verify SSL configuration:**
+   ```bash
+   # On server
+   cat .env | grep -E "SSL|CERT"
+   ```
+
+3. **Check signaling server logs:**
+   ```bash
+   tail -f logs/livestreaming.log | grep -i "signaling\|ssl\|wss"
+   ```
+
+**Expected behavior:**
+- Local: Uses `ws://localhost:8765` (plain WebSocket)
+- External (HTTPS): Uses `wss://YOUR_DOMAIN:8765` (secure WebSocket)
+
+### Certificate Permission Issues
+
+**Problem:** Signaling server fails to start with:
+```
+Permission denied: '/etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem'
+```
+
+**Solution:**
+
+Option A: Run signaling server with elevated permissions (not recommended):
+```bash
+# Temporary workaround
+sudo chmod 644 /etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem
+./scripts/managed_start.sh restart
+```
+
+Option B: Use Nginx reverse proxy (recommended for production):
+```bash
+# Nginx handles SSL, forwards to plain WS
+# Update soon - see SERVER_REFERENCE.md
+```
+
 ---
 
 **Still stuck?** Open an issue on GitHub with detailed logs and we'll help troubleshoot!
