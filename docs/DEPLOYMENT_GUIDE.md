@@ -176,23 +176,31 @@ docker stop kms-production && docker rm kms-production
 ```bash
 # Install coturn
 sudo apt install -y coturn
-
-# Enable coturn
-sudo nano /etc/default/coturn
-# Uncomment this line: TURNSERVER_ENABLED=1
-
-# Configure coturn
-sudo nano /etc/turnserver.conf
 ```
 
-**Configuration Options:**
+**⚠️ IMPORTANT: Domain Configuration**
 
-**Option A: Copy from existing server** (RECOMMENDED if you have working production server)
-- Copy your existing `/etc/turnserver.conf` from production
-- Update only the IP addresses to match new server
-- This is safer as you keep all working settings
+The TURN server `realm` and `server-name` MUST match your project's domain name from `.env`.
 
-**Option B: Use template below** (for fresh setups):
+**DO NOT copy config from reference server** - it uses a different domain (`camera.pahwa.net` vs `cameras.pahwa.net`)!
+
+**RECOMMENDED: Use Automated Configuration Script**
+
+```bash
+cd ~/camera-platform-local
+sudo ./scripts/configure_turn_server.sh
+```
+
+This script:
+- ✅ Reads domain from `.env` automatically
+- ✅ Configures realm and server-name to match
+- ✅ Auto-detects local and external IPs
+- ✅ Creates proper `/etc/turnserver.conf`
+- ✅ Enables and starts coturn service
+
+**Manual Configuration (Not Recommended):**
+
+If you must configure manually, see template below. **WARNING:** You MUST update ALL placeholders:
 
 **Paste this configuration** (replace placeholders with your values):
 
