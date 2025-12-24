@@ -92,8 +92,10 @@ else
 fi
 echo ""
 
-# Step 2: Add user to ssl-certs group
-echo "📝 Step 2: Add user to ssl-certs group"
+# Step 2: Add users to ssl-certs group
+echo "📝 Step 2: Add users to ssl-certs group"
+
+# Add actual user
 if id -nG "$ACTUAL_USER" | grep -qw ssl-certs; then
     echo "   ✅ User '$ACTUAL_USER' already in group 'ssl-certs'"
 else
@@ -102,6 +104,21 @@ else
     echo "   ⚠️  User needs to log out and back in for group changes to take effect"
     echo "   ⚠️  Or run: newgrp ssl-certs"
 fi
+
+# Add turnserver user (for CoTURN TURN server)
+if id turnserver >/dev/null 2>&1; then
+    if id -nG turnserver | grep -qw ssl-certs; then
+        echo "   ✅ User 'turnserver' already in group 'ssl-certs'"
+    else
+        usermod -a -G ssl-certs turnserver
+        echo "   ✅ Added user 'turnserver' to group 'ssl-certs'"
+        echo "   📌 CoTURN can now read SSL certificates for TLS support"
+    fi
+else
+    echo "   ⚠️  User 'turnserver' not found - CoTURN may not be installed yet"
+    echo "   💡 Run this script again after installing CoTURN"
+fi
+
 echo ""
 
 # Step 3: Set ownership and permissions on certificate directories

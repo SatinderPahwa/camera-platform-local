@@ -82,6 +82,29 @@ if [ ! -f "$CERT_FILE" ]; then
     echo "⚠️  WARNING: SSL certificates not found at $CERT_FILE"
     echo "CoTURN will be configured but won't start until certificates are available"
     echo ""
+else
+    # Check if turnserver user can read certificates
+    echo "Checking certificate permissions..."
+    if sudo -u turnserver test -r "$CERT_FILE" 2>/dev/null && sudo -u turnserver test -r "$KEY_FILE" 2>/dev/null; then
+        echo "✅ CoTURN (turnserver user) can read certificates"
+    else
+        echo ""
+        echo "❌ ERROR: CoTURN (turnserver user) CANNOT read SSL certificates"
+        echo ""
+        echo "This will prevent TURN over TLS (port 5349) from working!"
+        echo ""
+        echo "📌 FIX: Run the SSL setup script to configure permissions:"
+        echo "   sudo ./scripts/setup_ssl_certificates.sh"
+        echo ""
+        echo "That script will add the 'turnserver' user to the 'ssl-certs' group."
+        echo ""
+        read -p "Continue anyway? (yes/no): " continue_anyway
+        if [ "$continue_anyway" != "yes" ]; then
+            echo "❌ Configuration cancelled"
+            echo "💡 Run setup_ssl_certificates.sh first, then run this script again"
+            exit 1
+        fi
+    fi
 fi
 
 # Backup existing config

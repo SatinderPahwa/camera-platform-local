@@ -315,21 +315,48 @@ TTL: 300
 
 **Note:** Nginx is **NOT needed** for this setup. Dashboard runs directly on port 5000 with HTTPS.
 
-### Step 1.6: Update coturn with SSL Certificates
+### Step 1.6: Configure SSL Certificate Permissions
+
+**CRITICAL:** Before configuring CoTURN, set up proper SSL certificate permissions.
 
 ```bash
-# Edit coturn config
-sudo nano /etc/turnserver.conf
+cd ~/camera-platform-local
+sudo ./scripts/setup_ssl_certificates.sh
+```
 
-# Uncomment and update these lines:
-cert=/etc/letsencrypt/live/YOUR_DOMAIN/fullchain.pem
-pkey=/etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem
+This script:
+- ✅ Creates `ssl-certs` group with secure permissions
+- ✅ Adds your user to the group (for dashboard/signaling servers)
+- ✅ **Adds `turnserver` user to the group (for CoTURN TLS support)**
+- ✅ Sets proper permissions (640 for private keys, 644 for certs)
+- ✅ Creates Certbot renewal hook
+- ✅ Updates .env with SSL configuration
 
-# Start coturn
-sudo systemctl start coturn
-sudo systemctl enable coturn
+**Then configure CoTURN:**
 
-# Verify
+```bash
+cd ~/camera-platform-local
+sudo ./scripts/configure_turn_server.sh
+```
+
+This script will:
+- ✅ Read domain from .env automatically
+- ✅ Verify `turnserver` user can read certificates
+- ✅ Create `/etc/turnserver.conf` with correct realm/domain
+- ✅ Start and enable coturn service
+
+**Verify:**
+
+```bash
+# Check turnserver is in ssl-certs group
+groups turnserver
+# Should show: turnserver : turnserver ssl-certs
+
+# Check TURN server is running with TLS
+sudo ss -tlnp | grep -E '3478|5349'
+# Should show listeners on both ports
+
+# Check coturn status
 sudo systemctl status coturn
 ```
 
