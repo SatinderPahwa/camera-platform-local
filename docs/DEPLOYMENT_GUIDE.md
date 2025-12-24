@@ -51,10 +51,12 @@ Before starting, have these ready:
 
 **Required port forwarding (for remote access and livestreaming):**
 - Port `5000/tcp` - Dashboard HTTPS access.
+- Port `8765/tcp` - WebSocket signaling server (WSS).
+- Port `5001-5100/udp` - **CRITICAL:** Kurento Media Server WebRTC media ports (external video streaming).
+
+**Optional (only needed for restrictive NATs/firewalls):**
 - Port `3478/tcp+udp` - TURN/STUN server for WebRTC negotiation.
 - Port `5349/tcp+udp` - TURN/STUN server (TLS).
-- Port `49152-65535/udp` - TURN relay ports for media traversal.
-- Port `5000-5050/udp` - **CRITICAL:** Kurento RTP ports for receiving the camera's video/audio stream.
 
 **NOT needed for port forwarding (local network access only):**
 - Port `80` - Config server (cameras connect via local IP address).
