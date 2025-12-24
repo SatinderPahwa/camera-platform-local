@@ -107,8 +107,13 @@ stop_server() {
     if [ -f "$pid_file" ]; then
         local pid=$(cat "$pid_file")
         if ps -p "$pid" > /dev/null 2>&1; then
-            kill "$pid" 2>/dev/null || sudo kill "$pid" 2>/dev/null
-            echo "Stopped $name (PID: $pid)"
+            # Try regular kill first
+            if kill "$pid" 2>/dev/null; then
+                echo "Stopped $name (PID: $pid)"
+            else
+                # Process might be owned by root, try with sudo and force kill
+                sudo kill -9 "$pid" 2>/dev/null && echo "Stopped $name (PID: $pid) [required sudo]" || echo "Failed to stop $name"
+            fi
             rm "$pid_file"
         else
             rm "$pid_file"
@@ -158,7 +163,8 @@ case "$ACTION" in
         # Start servers in order
         start_server "config_server" "enhanced_config_server.py" true
         start_server "mqtt_processor" "local_mqtt_processor.py"
-        start_server "dashboard_server" "dashboard_server.py" true
+        # Dashboard doesn't need sudo - it uses port 5000 and reads SSL certs via ssl-certs group
+        start_server "dashboard_server" "dashboard_server.py" false
 
         # Start livestreaming system
         echo ""
