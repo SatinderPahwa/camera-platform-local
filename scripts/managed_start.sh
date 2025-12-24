@@ -158,7 +158,7 @@ case "$ACTION" in
         # Start servers in order
         start_server "config_server" "enhanced_config_server.py" true
         start_server "mqtt_processor" "local_mqtt_processor.py"
-        start_server "dashboard_server" "dashboard_server.py"
+        start_server "dashboard_server" "dashboard_server.py" true
 
         # Start livestreaming system
         echo ""
