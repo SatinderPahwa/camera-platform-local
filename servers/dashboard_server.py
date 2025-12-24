@@ -1128,10 +1128,7 @@ def livestream_viewer():
                          livestream_api_url=LIVESTREAM_API_URL,
                          signaling_url=os.getenv('LIVESTREAM_SIGNALING_URL', 'ws://localhost:8765'),
                          turn_config=turn_config,
-def main():
-    """Run the dashboard server"""
-    print("📱 Camera Dashboard Server")
-    print("=" * 50)
+                         page_title="Livestream Viewer")
 
 # =============================================================================
 # Admin Panel Endpoints
