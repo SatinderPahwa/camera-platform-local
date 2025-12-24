@@ -92,31 +92,45 @@ The fix simply provides the missing SSL certificate configuration.
    git pull origin gemini-livestream-fixes-2
    ```
 
-3. **Run SSL configuration script:**
+3. **Run SSL setup script (RECOMMENDED - implements secure group ownership):**
    ```bash
-   ./scripts/configure_ssl_signaling.sh
+   sudo ./scripts/setup_ssl_certificates.sh
    ```
 
-   The script will:
-   - Detect your domain (cameras.pahwa.net)
-   - Verify Let's Encrypt certificates exist
-   - Update .env with SSL paths
-   - Backup existing .env
+   This script implements the secure solution from TODO.md #2:
+   - Creates `ssl-certs` group
+   - Adds your user to the group
+   - Sets secure permissions (640 for private keys, 644 for certs)
+   - Creates Certbot renewal hook to maintain permissions
+   - Updates .env with SSL configuration
 
-4. **Verify .env configuration:**
+4. **Activate group membership:**
    ```bash
+   # Log out and back in (recommended)
+   exit
+   ssh satinder@camera1
+
+   # OR use newgrp (temporary for current shell)
+   newgrp ssl-certs
+   ```
+
+5. **Verify configuration:**
+   ```bash
+   # Check group membership
+   groups
+   # Should include: ssl-certs
+
+   # Check .env
    grep DASHBOARD_SSL .env
+   # Should show:
+   # DASHBOARD_SSL_ENABLED=true
+   # DASHBOARD_SSL_CERT_FILE=/etc/letsencrypt/live/cameras.pahwa.net/fullchain.pem
+   # DASHBOARD_SSL_KEY_FILE=/etc/letsencrypt/live/cameras.pahwa.net/privkey.pem
    ```
 
-   Should show:
-   ```
-   DASHBOARD_SSL_ENABLED=true
-   DASHBOARD_SSL_CERT_FILE=/etc/letsencrypt/live/cameras.pahwa.net/fullchain.pem
-   DASHBOARD_SSL_KEY_FILE=/etc/letsencrypt/live/cameras.pahwa.net/privkey.pem
-   ```
-
-5. **Restart services:**
+6. **Restart services:**
    ```bash
+   cd ~/camera-platform-local
    ./scripts/managed_start.sh restart
    ```
 
