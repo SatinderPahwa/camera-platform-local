@@ -332,8 +332,8 @@ def api_stats():
 def api_recordings(camera_id):
     """API endpoint for camera recordings with thumbnails"""
     try:
-        # Get activity events with recordings
-        events = dashboard.db.get_recent_activity_events(camera_id=camera_id, limit=1000)
+        # Get activity events with recordings (include events without end_timestamp)
+        events = dashboard.db.get_recent_activity_events(camera_id=camera_id, limit=1000, require_end_timestamp=False)
 
         # Filter events that have recordings (recording_path or thumbnail_path populated)
         recordings = []

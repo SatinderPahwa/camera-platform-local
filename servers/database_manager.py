@@ -253,19 +253,22 @@ class CameraDatabaseManager:
 
             conn.commit()
 
-    def get_recent_activity_events(self, camera_id=None, activity_types=None, limit=50):
+    def get_recent_activity_events(self, camera_id=None, activity_types=None, limit=50, require_end_timestamp=True):
         """Get recent activity events with recordings
 
         Args:
             camera_id: Filter by camera ID (optional)
             activity_types: List of activity types to filter (optional)
             limit: Maximum number of events to return
+            require_end_timestamp: Only return events with end_timestamp (default: True)
         """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
             # Build WHERE clause dynamically
-            where_clauses = ["end_timestamp IS NOT NULL"]
+            where_clauses = []
+            if require_end_timestamp:
+                where_clauses.append("end_timestamp IS NOT NULL")
             params = []
 
             # Camera filter
