@@ -49,17 +49,18 @@ Before starting, have these ready:
 
 ### 5. Router Configuration
 
-**Required port forwarding (for remote access):**
-- Port 5000 (TCP) - Dashboard HTTPS access
-- Port 3478 (TCP/UDP) - TURN server
-- Port 5349 (TCP/UDP) - TURN server (TLS)
-- Port 49152-65535 (UDP) - TURN relay ports
+**Required port forwarding (for remote access and livestreaming):**
+- Port `5000/tcp` - Dashboard HTTPS access.
+- Port `3478/tcp+udp` - TURN/STUN server for WebRTC negotiation.
+- Port `5349/tcp+udp` - TURN/STUN server (TLS).
+- Port `49152-65535/udp` - TURN relay ports for media traversal.
+- Port `5000-5050/udp` - **CRITICAL:** Kurento RTP ports for receiving the camera's video/audio stream.
 
-**NOT needed (local network only):**
-- Port 80 - Config server (cameras connect locally via IP address)
-- Port 8883 - EMQX MQTT (cameras connect locally)
+**NOT needed for port forwarding (local network access only):**
+- Port `80` - Config server (cameras connect via local IP address).
+- Port `8883` - EMQX MQTT (cameras connect via local IP address).
 
-**Note:** Dashboard is accessed as `https://your-domain.com:5000` (note the port number in URL)
+**Note:** The dashboard is accessed via `https://your-domain.com:5000`. The camera must be able to reach the server on the forwarded UDP ports for livestreaming to work.
 
 ---
 
