@@ -1914,15 +1914,28 @@ def serve_static(filename):
     return send_file(static_dir / filename)
 
 def main():
-    """Run the dashboard server"""
-    print("📱 Camera Dashboard Server")
-    print("=" * 50)
+    """Run the dashboard server - DEVELOPMENT MODE ONLY"""
+    print("=" * 70)
+    print("⚠️  WARNING: Flask Development Server")
+    print("=" * 70)
+    print()
+    print("You are running the Flask development server which is NOT suitable")
+    print("for production use. It is single-threaded and not secure.")
+    print()
+    print("For production deployment, use Gunicorn:")
+    print("  gunicorn --config config/gunicorn_config.py servers.wsgi:application")
+    print()
+    print("Or use the managed startup script:")
+    print("  ./scripts/managed_start.sh start")
+    print()
+    print("=" * 70)
+    print()
 
     # Show initial status
     overview = dashboard.get_camera_overview()
     stats = dashboard.get_database_stats()
 
-    print(f"\n📊 Dashboard Status:")
+    print(f"📊 Dashboard Status:")
     print(f"   Cameras: {len(overview)}")
     print(f"   Database Events: {stats['activity_events']}")
     print(f"   Status Events: {stats['status_events']}")
@@ -1945,8 +1958,9 @@ def main():
         protocol = "http"
         print(f"\n⚠️  Dashboard running HTTP (browsers will work, but iOS Safari WebRTC requires HTTPS)")
 
-    print(f"🌐 Starting dashboard server...")
+    print(f"\n🌐 Starting development server...")
     print(f"   URL: {protocol}://{DASHBOARD_SERVER_HOST}:{DASHBOARD_SERVER_PORT}")
+    print()
 
     app.run(
         host=DASHBOARD_SERVER_HOST,

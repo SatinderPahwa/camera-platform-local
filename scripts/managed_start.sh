@@ -99,6 +99,63 @@ start_server() {
     fi
 }
 
+# Function to start a server with Gunicorn
+start_server_gunicorn() {
+    local name=$1
+    local app_module=$2
+    local use_sudo=${3:-false}
+    local log_file="$LOG_DIR/${name}.log"
+    local pid_file="$PID_DIR/${name}.pid"
+
+    # Check if already running
+    if check_process "$name"; then
+        local pid=$(cat "$pid_file")
+        echo -e "${YELLOW}⚠️  ${name} already running (PID: $pid)${NC}"
+        return 0
+    fi
+
+    # Start Gunicorn
+    echo -n "Starting $name (Gunicorn)..."
+    cd "$PROJECT_DIR"
+
+    # Use venv python if available
+    local python_cmd="python3"
+    local gunicorn_cmd="gunicorn"
+    if [ -f "$PROJECT_DIR/venv/bin/python3" ]; then
+        python_cmd="$PROJECT_DIR/venv/bin/python3"
+        gunicorn_cmd="$PROJECT_DIR/venv/bin/gunicorn"
+    fi
+
+    # Set DATABASE_PATH to absolute path
+    export DATABASE_PATH="$PROJECT_DIR/data/camera_events.db"
+
+    if [ "$use_sudo" = true ]; then
+        # Dashboard with sudo (if needed for port 443)
+        sudo sh -c "DATABASE_PATH='$DATABASE_PATH' '$gunicorn_cmd' --config config/gunicorn_config.py --daemon '$app_module' 2>&1 | tee -a '$log_file'"
+        sleep 2
+        local pid=$(cat "$pid_file" 2>/dev/null || pgrep -f "gunicorn.*$app_module" | head -1)
+    else
+        # Normal startup without sudo
+        $gunicorn_cmd --config config/gunicorn_config.py --daemon "$app_module" >> "$log_file" 2>&1
+        sleep 2
+        local pid=$(cat "$pid_file" 2>/dev/null)
+    fi
+
+    if [ -z "$pid" ]; then
+        echo -e "${RED} ✗ Failed to start${NC}"
+        return 1
+    fi
+
+    # Verify PID file exists and process is running
+    if ps -p "$pid" > /dev/null 2>&1; then
+        echo -e "${GREEN} ✓ Started (PID: $pid)${NC}"
+        return 0
+    else
+        echo -e "${RED} ✗ Failed to start${NC}"
+        return 1
+    fi
+}
+
 # Function to stop a server
 stop_server() {
     local name=$1
@@ -107,12 +164,42 @@ stop_server() {
     if [ -f "$pid_file" ]; then
         local pid=$(cat "$pid_file")
         if ps -p "$pid" > /dev/null 2>&1; then
-            # Try regular kill first
-            if kill "$pid" 2>/dev/null; then
-                echo "Stopped $name (PID: $pid)"
+            # Check if this is a Gunicorn master process
+            if ps -p "$pid" -o command= | grep -q gunicorn; then
+                echo -n "Stopping $name (Gunicorn - graceful shutdown)..."
+
+                # Send TERM signal for graceful shutdown
+                if kill -TERM "$pid" 2>/dev/null; then
+                    # Wait up to 30 seconds for graceful shutdown
+                    local waited=0
+                    while ps -p "$pid" > /dev/null 2>&1 && [ $waited -lt 30 ]; do
+                        sleep 1
+                        waited=$((waited + 1))
+                    done
+
+                    if ps -p "$pid" > /dev/null 2>&1; then
+                        echo " timeout, force killing..."
+                        sudo kill -9 "$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null
+                    else
+                        echo " done"
+                    fi
+                else
+                    # Might need sudo
+                    sudo kill -TERM "$pid" 2>/dev/null
+                    sleep 2
+                    if ps -p "$pid" > /dev/null 2>&1; then
+                        sudo kill -9 "$pid" 2>/dev/null
+                    fi
+                    echo " done [required sudo]"
+                fi
             else
-                # Process might be owned by root, try with sudo and force kill
-                sudo kill -9 "$pid" 2>/dev/null && echo "Stopped $name (PID: $pid) [required sudo]" || echo "Failed to stop $name"
+                # Regular process (not Gunicorn)
+                if kill "$pid" 2>/dev/null; then
+                    echo "Stopped $name (PID: $pid)"
+                else
+                    # Process might be owned by root, try with sudo and force kill
+                    sudo kill -9 "$pid" 2>/dev/null && echo "Stopped $name (PID: $pid) [required sudo]" || echo "Failed to stop $name"
+                fi
             fi
             rm "$pid_file"
         else
@@ -163,8 +250,8 @@ case "$ACTION" in
         # Start servers in order
         start_server "config_server" "enhanced_config_server.py" true
         start_server "mqtt_processor" "local_mqtt_processor.py"
-        # Dashboard doesn't need sudo - it uses port 5000 and reads SSL certs via ssl-certs group
-        start_server "dashboard_server" "dashboard_server.py" false
+        # Dashboard runs on Gunicorn (production WSGI server) - port 5000, reads SSL certs via ssl-certs group
+        start_server_gunicorn "dashboard_server" "servers.wsgi:application" false
 
         # Start livestreaming system
         echo ""
