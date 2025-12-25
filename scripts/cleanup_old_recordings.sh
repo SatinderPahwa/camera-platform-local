@@ -8,9 +8,12 @@ echo "Cleanup Old Recordings (Keep Last 5)"
 echo "==========================================="
 echo ""
 
+# Get the actual user (not root when using sudo)
+ACTUAL_USER="${SUDO_USER:-$USER}"
+
 # Paths
 RECORDINGS_DIR="/data/uploads/56C1CADCF1FA4C6CAEBA3E2FD85EFEBF/activity"
-DB_PATH="$HOME/camera-platform-local/data/camera_events.db"
+DB_PATH="/home/$ACTUAL_USER/camera-platform-local/data/camera_events.db"
 
 # Check if running with sudo (needed for /data access)
 if [ "$EUID" -ne 0 ]; then
@@ -43,7 +46,6 @@ echo ""
 
 # 3. Clean up database (keep last 5 events)
 echo "3️⃣  Cleaning up database..."
-ACTUAL_USER="${SUDO_USER:-$USER}"
 
 # Count before cleanup
 BEFORE_COUNT=$(sudo -u "$ACTUAL_USER" sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM activity_events;")
