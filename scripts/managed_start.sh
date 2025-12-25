@@ -21,6 +21,16 @@ mkdir -p "$LOG_DIR"
 mkdir -p "$PROJECT_DIR/data"
 mkdir -p "$PROJECT_DIR/data/uploads"
 
+# Load environment variables from .env file
+if [ -f "$PROJECT_DIR/.env" ]; then
+    set -a  # Export all variables
+    source "$PROJECT_DIR/.env"
+    set +a  # Stop exporting
+    echo "✓ Loaded environment from .env"
+else
+    echo "⚠️  Warning: .env file not found at $PROJECT_DIR/.env"
+fi
+
 echo "======================================"
 echo "VBC01 Camera Platform - EMQX Edition"
 echo "======================================"
