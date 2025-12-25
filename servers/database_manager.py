@@ -148,16 +148,46 @@ class CameraDatabaseManager:
             print("✅ Database initialized with all required tables")
 
     def add_activity_start_event(self, event_id, camera_id, activity_type, timestamp, confidence=None, camera_name=None):
-        """Add activity start event"""
+        """Add activity start event (only if it doesn't exist - prevents overwriting file upload data)"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                INSERT OR REPLACE INTO activity_events
-                (event_id, camera_id, camera_name, activity_type, start_timestamp, confidence, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, strftime('%s','now'))
-            ''', (event_id, camera_id, camera_name, activity_type, timestamp, confidence))
-            conn.commit()
-            print(f"📍 Activity START: {activity_type} on camera {camera_id} (event {event_id})")
+
+            # Check if event already exists
+            cursor.execute('SELECT event_id FROM activity_events WHERE event_id = ?', (event_id,))
+            existing = cursor.fetchone()
+
+            if existing:
+                # Event exists - only update camera_name and confidence if needed
+                # DO NOT use INSERT OR REPLACE as it wipes recording_path and upload_status
+                update_fields = []
+                values = []
+
+                if camera_name:
+                    update_fields.append('camera_name = ?')
+                    values.append(camera_name)
+
+                if confidence is not None:
+                    update_fields.append('confidence = ?')
+                    values.append(confidence)
+
+                if update_fields:
+                    update_fields.append("updated_at = strftime('%s','now')")
+                    query = f"UPDATE activity_events SET {', '.join(update_fields)} WHERE event_id = ?"
+                    values.append(event_id)
+                    cursor.execute(query, values)
+                    conn.commit()
+                    print(f"📍 Activity START: Updated existing event {event_id} (preserving upload data)")
+                else:
+                    print(f"📍 Activity START: Event {event_id} already exists (no update needed)")
+            else:
+                # Event doesn't exist - create it
+                cursor.execute('''
+                    INSERT INTO activity_events
+                    (event_id, camera_id, camera_name, activity_type, start_timestamp, confidence, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, strftime('%s','now'))
+                ''', (event_id, camera_id, camera_name, activity_type, timestamp, confidence))
+                conn.commit()
+                print(f"📍 Activity START: {activity_type} on camera {camera_id} (event {event_id})")
 
     def add_activity_end_event(self, event_id, timestamp):
         """Complete activity event with end time and duration"""
