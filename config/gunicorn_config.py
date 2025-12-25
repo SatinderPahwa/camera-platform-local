@@ -91,3 +91,18 @@ def worker_int(worker):
 def worker_abort(worker):
     """Called when a worker is killed"""
     print(f"❌ Worker {worker.pid} aborted")
+
+def post_worker_init(worker):
+    """Called after a worker has initialized the application"""
+    print(f"✅ Worker {worker.pid} initialized - checking MQTT connection...")
+    # Import here to access the initialized app
+    try:
+        from servers.dashboard_server import mqtt_client, mqtt_connected
+        if mqtt_client:
+            client_id = getattr(mqtt_client, '_client_id', 'unknown')
+            status = "connected" if mqtt_connected else "connecting"
+            print(f"   Worker {worker.pid}: MQTT client '{client_id.decode() if isinstance(client_id, bytes) else client_id}' - {status}")
+        else:
+            print(f"   Worker {worker.pid}: ⚠️  MQTT client is None!")
+    except Exception as e:
+        print(f"   Worker {worker.pid}: ❌ Error checking MQTT: {e}")
