@@ -727,7 +727,8 @@ def events_page():
     all_events = dashboard.db.get_recent_activity_events(
         camera_id=camera_filter,
         activity_types=activity_types,
-        limit=10000  # High limit to get all matching events for count
+        limit=10000,  # High limit to get all matching events for count
+        require_end_timestamp=False  # Show all events, even without end_timestamp
     )
 
     # Calculate pagination
