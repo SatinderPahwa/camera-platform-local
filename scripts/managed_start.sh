@@ -31,6 +31,15 @@ else
     echo "⚠️  Warning: .env file not found at $PROJECT_DIR/.env"
 fi
 
+# Convert relative paths to absolute (in case .env uses relative paths)
+# This ensures LOG_DIR and PID_DIR work correctly even after cd commands
+if [[ ! "$PID_DIR" = /* ]]; then
+    PID_DIR="$PROJECT_DIR/$PID_DIR"
+fi
+if [[ ! "$LOG_DIR" = /* ]]; then
+    LOG_DIR="$PROJECT_DIR/$LOG_DIR"
+fi
+
 echo "======================================"
 echo "VBC01 Camera Platform - EMQX Edition"
 echo "======================================"
