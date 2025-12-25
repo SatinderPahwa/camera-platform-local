@@ -364,18 +364,61 @@ sudo systemctl status coturn
 
 ### Step 1.7: Configure Firewall
 
+**RECOMMENDED: Use Automated Configuration Script**
+
+```bash
+cd ~/camera-platform-local
+sudo ./scripts/configure_firewall.sh
+```
+
+This script automatically:
+- ✅ Detects your local network
+- ✅ Configures all required ports
+- ✅ Restricts local-only services (config server, EMQX dashboard)
+- ✅ Enables firewall with safe defaults
+- ✅ Provides verification output
+
+**Ports configured:**
+
+**From anywhere:**
+- 22/tcp - SSH
+- 5000/tcp - Dashboard (HTTPS)
+- 8080/tcp - Livestream API
+- 8765/tcp - WebSocket signaling (WebRTC)
+- 8883/tcp - EMQX MQTT broker
+- 3478/tcp+udp - TURN/STUN
+- 5349/tcp+udp - TURN/STUN TLS
+- 5000:5050/udp - Kurento WebRTC media
+- 49152:65535/udp - TURN relay ports
+
+**From local network only:**
+- 80/tcp - Config server (cameras)
+- 8083/tcp - EMQX dashboard HTTP
+- 8084/tcp - EMQX dashboard HTTPS
+
+**Manual Configuration (Not Recommended):**
+
+If you must configure manually:
+
 ```bash
 # Enable UFW
 sudo ufw enable
 
-# SSH (adjust port if changed)
+# Set defaults
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# SSH
 sudo ufw allow 22/tcp
 
-# Dashboard (HTTPS access)
+# Dashboard
 sudo ufw allow 5000/tcp
 
-# Config server (cameras connect locally - no external access needed)
-# Note: Port 80 is for local network only, no firewall rule needed
+# Livestream API
+sudo ufw allow 8080/tcp
+
+# WebSocket signaling
+sudo ufw allow 8765/tcp
 
 # EMQX MQTT
 sudo ufw allow 8883/tcp
@@ -386,11 +429,35 @@ sudo ufw allow 3478/udp
 sudo ufw allow 5349/tcp
 sudo ufw allow 5349/udp
 
-# TURN relay ports (ephemeral port range)
+# Kurento WebRTC media
+sudo ufw allow 5000:5050/udp
+
+# TURN relay ports
 sudo ufw allow 49152:65535/udp
+
+# Config server (local network only - replace with your network)
+sudo ufw allow from 192.168.1.0/24 to any port 80 proto tcp
+
+# EMQX dashboard (local network only)
+sudo ufw allow from 192.168.1.0/24 to any port 8083 proto tcp
+sudo ufw allow from 192.168.1.0/24 to any port 8084 proto tcp
 
 # Check status
 sudo ufw status verbose
+```
+
+**Verify firewall:**
+
+```bash
+# Check status
+sudo ufw status verbose
+
+# Test from external IP
+ssh your-user@YOUR_EXTERNAL_IP
+curl https://YOUR_DOMAIN:5000
+
+# View logs
+sudo tail -f /var/log/ufw.log
 ```
 
 ✅ **Infrastructure complete!** All services are now running.
