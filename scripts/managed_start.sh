@@ -124,13 +124,22 @@ start_server_gunicorn() {
     local app_module=$2
     local use_sudo=${3:-false}
     local log_file="$LOG_DIR/${name}.log"
+    # Gunicorn creates its own PID file at pids/gunicorn.pid (set in gunicorn_config.py)
+    local gunicorn_pid_file="$PID_DIR/gunicorn.pid"
+    # Also maintain dashboard_server.pid for compatibility with managed_status.sh
     local pid_file="$PID_DIR/${name}.pid"
 
-    # Check if already running
-    if check_process "$name"; then
-        local pid=$(cat "$pid_file")
-        echo -e "${YELLOW}⚠️  ${name} already running (PID: $pid)${NC}"
-        return 0
+    # Check if already running by checking gunicorn.pid
+    if [ -f "$gunicorn_pid_file" ]; then
+        local pid=$(cat "$gunicorn_pid_file")
+        if ps -p "$pid" > /dev/null 2>&1; then
+            echo -e "${YELLOW}⚠️  ${name} already running (PID: $pid)${NC}"
+            return 0
+        else
+            # Stale PID file, remove it
+            rm "$gunicorn_pid_file" 2>/dev/null
+            rm "$pid_file" 2>/dev/null
+        fi
     fi
 
     # Start Gunicorn
@@ -152,25 +161,37 @@ start_server_gunicorn() {
         # Dashboard with sudo (if needed for port 443)
         sudo sh -c "DATABASE_PATH='$DATABASE_PATH' '$gunicorn_cmd' --config config/gunicorn_config.py --daemon '$app_module' 2>&1 | tee -a '$log_file'"
         sleep 2
-        local pid=$(cat "$pid_file" 2>/dev/null || pgrep -f "gunicorn.*$app_module" | head -1)
     else
         # Normal startup without sudo
         $gunicorn_cmd --config config/gunicorn_config.py --daemon "$app_module" >> "$log_file" 2>&1
         sleep 2
-        local pid=$(cat "$pid_file" 2>/dev/null)
     fi
 
-    if [ -z "$pid" ]; then
-        echo -e "${RED} ✗ Failed to start${NC}"
+    # Wait for Gunicorn to create its PID file
+    local waited=0
+    while [ ! -f "$gunicorn_pid_file" ] && [ $waited -lt 5 ]; do
+        sleep 1
+        waited=$((waited + 1))
+    done
+
+    # Read PID from Gunicorn's PID file
+    if [ -f "$gunicorn_pid_file" ]; then
+        local pid=$(cat "$gunicorn_pid_file")
+        # Also copy to dashboard_server.pid for compatibility
+        echo $pid > "$pid_file"
+    else
+        echo -e "${RED} ✗ Failed to start (PID file not created)${NC}"
         return 1
     fi
 
-    # Verify PID file exists and process is running
+    # Verify process is running
     if ps -p "$pid" > /dev/null 2>&1; then
         echo -e "${GREEN} ✓ Started (PID: $pid)${NC}"
         return 0
     else
         echo -e "${RED} ✗ Failed to start${NC}"
+        rm "$pid_file" 2>/dev/null
+        rm "$gunicorn_pid_file" 2>/dev/null
         return 1
     fi
 }
