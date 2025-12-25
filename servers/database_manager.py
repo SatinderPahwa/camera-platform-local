@@ -282,7 +282,7 @@ class CameraDatabaseManager:
                 where_clauses.append(f"activity_type IN ({placeholders})")
                 params.extend(activity_types)
 
-            where_clause = " AND ".join(where_clauses)
+            where_clause = " AND ".join(where_clauses) if where_clauses else ""
             params.append(limit)
 
             query = f'''
@@ -290,7 +290,7 @@ class CameraDatabaseManager:
                        start_timestamp, end_timestamp, duration_seconds, confidence,
                        recording_filename, recording_path, thumbnail_path, upload_status
                 FROM activity_events
-                WHERE {where_clause}
+                {"WHERE " + where_clause if where_clause else ""}
                 ORDER BY start_timestamp DESC
                 LIMIT ?
             '''
