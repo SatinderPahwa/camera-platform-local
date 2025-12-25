@@ -78,7 +78,7 @@ ssh your-user@your-server-ip
 sudo apt update && sudo apt upgrade -y
 
 # Install essential tools
-sudo apt install -y curl wget git vim build-essential software-properties-common
+sudo apt install -y curl wget git vim build-essential software-properties-common ffmpeg
 
 # Set timezone (adjust to yours)
 sudo timedatectl set-timezone America/New_York
