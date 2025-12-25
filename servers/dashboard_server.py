@@ -87,7 +87,12 @@ def init_mqtt_client():
     """Initialize MQTT client in background thread"""
     global mqtt_client
     try:
-        mqtt_client = mqtt.Client(client_id="camera_dashboard")
+        # Use unique client ID per worker process (for Gunicorn)
+        # Each worker needs its own MQTT connection to avoid client ID conflicts
+        worker_id = os.getpid()
+        client_id = f"camera_dashboard_worker_{worker_id}"
+
+        mqtt_client = mqtt.Client(client_id=client_id)
         mqtt_client.on_connect = on_mqtt_connect
         mqtt_client.on_disconnect = on_mqtt_disconnect
 
@@ -95,7 +100,7 @@ def init_mqtt_client():
         mqtt_client.connect(MQTT_BROKER_HOST, MQTT_BROKER_PORT, MQTT_KEEPALIVE)
         mqtt_client.loop_start()  # Start background thread
 
-        logger.info(f"MQTT client connecting to {MQTT_BROKER_HOST}:{MQTT_BROKER_PORT}")
+        logger.info(f"MQTT client (ID: {client_id}) connecting to {MQTT_BROKER_HOST}:{MQTT_BROKER_PORT}")
     except Exception as e:
         logger.error(f"Failed to initialize MQTT client: {e}")
         mqtt_client = None
