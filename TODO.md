@@ -20,51 +20,44 @@
 
 **Status:** Not started. This is the next critical fix.
 
-### 2. Address SSL Private Key Permissions (Security Vulnerability)
+### 2. ✅ COMPLETED - Address SSL Private Key Permissions (Security Vulnerability)
 
-**Current Issue:**
-- To enable the dashboard server (running as a non-root user) to serve HTTPS, the permissions on the Let's Encrypt private key (`/etc/letsencrypt/live/your.domain/privkey.pem`) were loosened to be world-readable (`644`).
-- **NEW:** The same issue applies to the WebSocket signaling server for WSS (secure WebSocket) support needed for external HTTPS access.
-- This is a significant security risk, as any user on the server can read the private SSL key.
+**Solution Implemented:** Group ownership with automated management
+
+**What was done:**
+- ✅ Created `scripts/setup_ssl_certificates.sh` automation script
+- ✅ Created `ssl-certs` group with secure permissions
+- ✅ Added user and turnserver to ssl-certs group
+- ✅ Set directory permissions to 750, private key to 640
+- ✅ Automated Certbot renewal hook preserves permissions
+- ✅ Updated .env with SSL configuration
+- ✅ No world-readable keys (secure by default)
 
 **Affects:**
-- Dashboard server (port 5000, HTTPS)
-- WebSocket signaling server (port 8765, WSS) - **ADDED**
+- Dashboard server (port 5000, HTTPS) - via Gunicorn
+- WebSocket signaling server (port 8765, WSS) - via ssl-certs group
 
-**Constraint:**
-- Config server runs on port 80 (cameras connect here) - **cannot use Nginx on port 80**
-- Dashboard uses port 5000 with direct HTTPS
-- Nginx reverse proxy not viable due to port 80 conflict
+**Status:** ✅ **COMPLETE** - Fully automated, secure, repeatable
 
-**Recommended Long-Term Solutions (choose one):**
-- **A) Change Group Ownership** (RECOMMENDED given port 80 constraint): Change the group ownership of the `/etc/letsencrypt/archive/` and `/etc/letsencrypt/live/` directories to a specific group (e.g., `ssl-certs`), add the `satinder` user to that group, and set directory permissions to `750` and private key permissions to `640`. This is more secure than world-readable. Add automation to handle Certbot renewals.
-- **B) Use Gunicorn with `sudo`**: Implement the Gunicorn WSGI server with sudo start + privilege drop. Gunicorn can be started with `sudo` to read the key, then drop privileges to run worker processes as non-root user.
-- **C) Systemd with CapabilityBoundingSet**: Use systemd service files with `AmbientCapabilities=CAP_NET_BIND_SERVICE` and `ReadOnlyPaths=` to grant specific access to certificates without world-readable permissions.
+### 3. ✅ COMPLETED - Replace Flask Development Server with Production WSGI Server
 
-**Status:** A temporary, insecure workaround (`chmod 644`) is in place. Solution A (group ownership) recommended.
+**Solution Implemented:** Gunicorn with gevent workers and SSL support
 
-**Security Issue Found in Reference Implementation:**
-- The reference project (`camera-project`) has the same SSL private key permission issue
-- This is a common limitation when running Python services as non-root users
-- Both projects should implement solution A (group ownership) for production given the port 80 constraint
+**What was done:**
+- ✅ Created `servers/wsgi.py` entry point
+- ✅ Created `config/gunicorn_config.py` with production settings:
+  - 9 workers: (2 × CPU cores) + 1, capped at 9
+  - Gevent worker class for async I/O (streaming)
+  - 120s timeout for large downloads
+  - SSL via ssl-certs group ownership
+  - Graceful shutdown (SIGTERM with 30s timeout)
+  - Worker recycling (1000 requests per worker)
+  - PID file tracking: `pids/gunicorn.pid`
+- ✅ Updated `scripts/managed_start.sh` with `start_server_gunicorn()` function
+- ✅ Updated stop logic for graceful Gunicorn shutdown
+- ✅ Dashboard server updated with dev mode warnings
 
-### 3. Replace Flask Development Server with a Production WSGI Server
-
-**Current Issue:**
-- The platform uses Flask's built-in development server, which is not suitable for production.
-- It is single-threaded, inefficient, and can lead to connection leaks, necessitating scheduled restarts.
-
-**Recommended Solution:**
-- Replace the Flask development server with **Gunicorn**. (This directly ties into solving the security vulnerability above).
-
-**Implementation Steps:**
-1. Install Gunicorn: `pip install gunicorn`
-2. Update `scripts/managed_start.sh` to launch the dashboard with Gunicorn:
-   ```bash
-   gunicorn -w 4 -b 0.0.0.0:5000 --timeout 120 --access-logfile logs/gunicorn_access.log --error-logfile logs/gunicorn_error.log servers.dashboard_server:app
-   ```
-
-**Status:** Not started. To be addressed after all streaming functionality is stable.
+**Status:** ✅ **COMPLETE** - Running in production on camera1
 
 ### 4. Re-enable and Configure Firewall
 
@@ -91,5 +84,23 @@
 ## Low Priority
 
 - **Add Automated Tests:** Create a test suite for API endpoints and core logic.
-- **Implement Logging Rotation:** Configure `logrotate` for all custom log files to prevent them from growing indefinitely.
+- ✅ **~~Implement Logging Rotation:~~** **COMPLETE** - `tools/cleanup_old_logs.sh` removes logs >15 days old, rotates large files, runs daily at 3 AM via cron
 - **Improve Documentation:** Add a developer guide and more detailed API documentation.
+
+---
+
+## Recently Completed (Infrastructure Improvements)
+
+### Production Hardening & Self-Healing
+- ✅ Created `scripts/setup_production_hardening.sh` - Full automation
+- ✅ Systemd service for auto-start on boot
+- ✅ Health monitoring every 12 minutes with auto-restart
+- ✅ Enhanced health checks now restart CoTURN, Kurento, EMQX, platform services
+- ✅ Scheduled restarts every 8 hours (8 AM, 4 PM, Midnight)
+- ✅ Automated log cleanup (daily at 3 AM, >15 days retention)
+- ✅ Sudo rules for passwordless service management
+- ✅ Complete self-healing for all infrastructure services
+
+### Documentation
+- ✅ Created `docs/AUTOMATED_DEPLOYMENT.md` - Comprehensive automation guide
+- ✅ Updated `docs/DEPLOYMENT_GUIDE.md` - Replaced manual steps with automation
