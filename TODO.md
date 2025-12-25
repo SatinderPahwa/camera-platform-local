@@ -75,18 +75,40 @@
 
 **Status:** ✅ **COMPLETE** - Running in production on camera1
 
-### 5. Re-enable and Configure Firewall
+### 5. ✅ COMPLETED - Re-enable and Configure Firewall
 
-**Current Issue:**
-- The `ufw` firewall on the server was disabled as a temporary measure to diagnose the RTP/RTCP issue.
-- Running without a host firewall is a security risk.
+**Solution Implemented:** Automated firewall configuration script
 
-**Recommended Solution:**
-- Once all services are confirmed to be working correctly, re-enable `ufw`.
-- Methodically add back the `allow` rules one by one, testing the stream at each step to identify the specific rule or default policy that was interfering with RTCP traffic.
-- The goal is to have a minimal but fully functional set of firewall rules.
+**What was done:**
+- ✅ Created `scripts/configure_firewall.sh` automation script
+- ✅ Auto-detects local network for local-only rules
+- ✅ Configures all 17 required firewall rules
+- ✅ Public ports: SSH, dashboard, livestream API, WebSocket, MQTT, TURN, Kurento media
+- ✅ Local-only ports: Config server (80), EMQX dashboard (8083/8084)
+- ✅ Updated DEPLOYMENT_GUIDE.md with correct port list
+- ✅ Fixed missing ports in documentation (8080 livestream API, 8765 WebSocket)
 
-**Status:** Not started. To be addressed after the REMB issue is fixed.
+**Ports configured:**
+- From anywhere: 22, 5000, 8080, 8765, 8883, 3478, 5349, 5000-5050/udp, 49152-65535/udp
+- From local network only: 80, 8083, 8084
+
+**Status:** ✅ **COMPLETE** - Firewall active and tested from local + external networks
+
+### 6. ✅ COMPLETED - Fix Gunicorn MQTT Client ID Conflict
+
+**Issue:**
+- Dashboard MQTT commands failed with "MQTT client not connected"
+- All 9 Gunicorn workers used same MQTT client ID "camera_dashboard"
+- EMQX only allows ONE connection per client ID
+- Only 1 worker had working MQTT connection (11% success rate)
+
+**Solution Implemented:**
+- ✅ Changed MQTT client ID to include worker PID: `camera_dashboard_worker_{PID}`
+- ✅ Each of 9 workers now has unique MQTT connection
+- ✅ Camera commands (reboot, mode change) work consistently
+- ✅ Added Gunicorn post_worker_init hook for diagnostics
+
+**Status:** ✅ **COMPLETE** - All workers connected, commands work from local + external
 
 ---
 
