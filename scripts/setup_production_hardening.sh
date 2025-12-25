@@ -126,9 +126,12 @@ if [ -f "$SUDOERS_FILE" ] && grep -q "NOPASSWD.*emqx" "$SUDOERS_FILE" 2>/dev/nul
 else
     # Create sudoers file
     cat > "$SUDOERS_FILE" << EOF
-# Camera Platform - Allow passwordless EMQX commands for health checks
+# Camera Platform - Allow passwordless commands for health checks and auto-restart
 # Created by: setup_production_hardening.sh
 $ACTUAL_USER ALL=(ALL) NOPASSWD: /usr/bin/emqx
+$ACTUAL_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart emqx
+$ACTUAL_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart coturn
+$ACTUAL_USER ALL=(ALL) NOPASSWD: /usr/bin/docker restart kms-production
 EOF
 
     # Set correct permissions (sudoers files must be 0440)
@@ -170,6 +173,16 @@ else
     echo "# Camera Platform: Scheduled restarts every 8 hours (8 AM, 4 PM, Midnight)" >> "$TEMP_CRON"
     echo "0 8,16,0 * * * $PROJECT_ROOT/cron_restart_wrapper.sh >> $PROJECT_ROOT/logs/cron_restart.log 2>&1" >> "$TEMP_CRON"
     echo "   ✅ Added scheduled restart cron job (8 AM, 4 PM, Midnight)"
+fi
+
+# Check if log cleanup cron already exists
+if grep -q "cleanup_old_logs.sh" "$TEMP_CRON" 2>/dev/null; then
+    echo "   ✅ Log cleanup cron job already configured"
+else
+    echo "" >> "$TEMP_CRON"
+    echo "# Camera Platform: Cleanup logs older than 15 days (daily at 3 AM)" >> "$TEMP_CRON"
+    echo "0 3 * * * $PROJECT_ROOT/tools/cleanup_old_logs.sh >> $PROJECT_ROOT/logs/cleanup.log 2>&1" >> "$TEMP_CRON"
+    echo "   ✅ Added log cleanup cron job (daily at 3 AM)"
 fi
 
 # Install crontab (make temp file readable by user first)

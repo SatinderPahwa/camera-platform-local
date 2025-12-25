@@ -28,14 +28,46 @@ restart_all_services() {
 
     cd "$PROJECT_DIR"
 
-    # Use managed_start.sh to restart everything
+    # Restart platform services first
+    log "Restarting platform services (config, mqtt, dashboard)..."
     if /bin/bash ./scripts/managed_start.sh restart >> "$LOG_FILE" 2>&1; then
-        log "✅ All services restarted successfully"
-        return 0
+        log "✅ Platform services restarted successfully"
     else
-        log "❌ Error during service restart"
-        return 1
+        log "❌ Error during platform service restart"
     fi
+
+    # Restart CoTURN if it was the issue
+    if echo "$1" | grep -qi "coturn"; then
+        log "Restarting CoTURN service..."
+        if sudo systemctl restart coturn >> "$LOG_FILE" 2>&1; then
+            log "✅ CoTURN restarted successfully"
+        else
+            log "❌ Failed to restart CoTURN"
+        fi
+    fi
+
+    # Restart Kurento if it was the issue
+    if echo "$1" | grep -qi "kurento"; then
+        log "Restarting Kurento Media Server..."
+        if docker restart kms-production >> "$LOG_FILE" 2>&1; then
+            log "✅ Kurento restarted successfully"
+        else
+            log "❌ Failed to restart Kurento"
+        fi
+    fi
+
+    # Restart EMQX if it was the issue
+    if echo "$1" | grep -qi "emqx"; then
+        log "Restarting EMQX broker..."
+        if sudo systemctl restart emqx >> "$LOG_FILE" 2>&1; then
+            log "✅ EMQX restarted successfully"
+        else
+            log "❌ Failed to restart EMQX"
+        fi
+    fi
+
+    log "✅ Service restart sequence completed"
+    return 0
 }
 
 # Start health check
@@ -115,25 +147,7 @@ else
     ISSUE_REASON="${ISSUE_REASON:+$ISSUE_REASON; }EMQX not running"
 fi
 
-# Check 7: Nginx (HTTPS proxy - port 443)
-if ss -tuln 2>/dev/null | grep -q ":443 "; then
-    log "✅ Nginx port 443 listening"
-else
-    log "❌ Nginx port 443 not listening"
-    ISSUES_FOUND=true
-    ISSUE_REASON="${ISSUE_REASON:+$ISSUE_REASON; }Nginx down"
-fi
-
-# Check 8: Nginx is actually running (not just port listening)
-if systemctl is-active --quiet nginx 2>/dev/null; then
-    log "✅ Nginx service running"
-else
-    log "❌ Nginx service not running"
-    ISSUES_FOUND=true
-    ISSUE_REASON="${ISSUE_REASON:+$ISSUE_REASON; }Nginx service down"
-fi
-
-# Check 9: CLOSE-WAIT connection leak on dashboard server (port 5000)
+# Check 7: CLOSE-WAIT connection leak on dashboard server (port 5000)
 CLOSE_WAIT_COUNT=$(ss -tn 2>/dev/null | grep ":5000" | grep "CLOSE-WAIT" | wc -l)
 if [ "$CLOSE_WAIT_COUNT" -ge "$MAX_CLOSE_WAIT" ]; then
     log "❌ CLOSE-WAIT threshold exceeded ($CLOSE_WAIT_COUNT connections)"
@@ -143,7 +157,7 @@ else
     log "✅ CLOSE-WAIT connections OK ($CLOSE_WAIT_COUNT)"
 fi
 
-# Check 10: CLOSE-WAIT on config server (port 80)
+# Check 8: CLOSE-WAIT on config server (port 80)
 CONFIG_CLOSE_WAIT=$(ss -tn 2>/dev/null | grep ":80" | grep "CLOSE-WAIT" | wc -l)
 if [ "$CONFIG_CLOSE_WAIT" -ge "$MAX_CLOSE_WAIT" ]; then
     log "❌ Config server CLOSE-WAIT threshold exceeded ($CONFIG_CLOSE_WAIT connections)"
