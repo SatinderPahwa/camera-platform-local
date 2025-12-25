@@ -92,16 +92,26 @@ chown "$ACTUAL_USER:$ACTUAL_USER" "$SERVICE_FILE"
 echo "   ✅ Created service file: $SERVICE_FILE"
 
 # Reload systemd daemon and enable service (as user)
-su - "$ACTUAL_USER" -c "systemctl --user daemon-reload"
-su - "$ACTUAL_USER" -c "systemctl --user enable camera-platform.service"
-echo "   ✅ Enabled camera-platform.service"
+# Need to set XDG_RUNTIME_DIR for systemctl --user to work
+export XDG_RUNTIME_DIR="/run/user/$(id -u $ACTUAL_USER)"
 
-# Start service if not already running
-if su - "$ACTUAL_USER" -c "systemctl --user is-active camera-platform.service" >/dev/null 2>&1; then
-    echo "   ✅ Service already running"
+if sudo -u "$ACTUAL_USER" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" systemctl --user daemon-reload 2>/dev/null; then
+    sudo -u "$ACTUAL_USER" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" systemctl --user enable camera-platform.service 2>/dev/null
+    echo "   ✅ Enabled camera-platform.service"
+
+    # Start service if not already running
+    if sudo -u "$ACTUAL_USER" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" systemctl --user is-active camera-platform.service >/dev/null 2>&1; then
+        echo "   ✅ Service already running"
+    else
+        echo "   📌 Note: Service not started yet (will auto-start on next boot)"
+        echo "      To start now: systemctl --user start camera-platform.service"
+    fi
 else
-    echo "   📌 Note: Service not started yet (will auto-start on next boot)"
-    echo "      To start now: systemctl --user start camera-platform.service"
+    echo "   ⚠️  Could not enable systemd service automatically"
+    echo "   📌 Run these commands manually as $ACTUAL_USER (without sudo):"
+    echo "      systemctl --user daemon-reload"
+    echo "      systemctl --user enable camera-platform.service"
+    echo "      systemctl --user start camera-platform.service"
 fi
 echo ""
 
@@ -141,7 +151,7 @@ echo "📝 Step 4: Configure cron jobs"
 
 # Get current crontab
 TEMP_CRON=$(mktemp)
-su - "$ACTUAL_USER" -c "crontab -l" > "$TEMP_CRON" 2>/dev/null || true
+sudo -u "$ACTUAL_USER" crontab -l > "$TEMP_CRON" 2>/dev/null || true
 
 # Check if health check cron already exists
 if grep -q "health_check_and_restart.sh" "$TEMP_CRON" 2>/dev/null; then
@@ -163,7 +173,7 @@ else
 fi
 
 # Install crontab
-su - "$ACTUAL_USER" -c "crontab $TEMP_CRON"
+sudo -u "$ACTUAL_USER" crontab "$TEMP_CRON"
 rm "$TEMP_CRON"
 echo ""
 
@@ -172,7 +182,7 @@ echo "📝 Step 5: Verify cron configuration"
 echo ""
 echo "Current crontab for $ACTUAL_USER:"
 echo "-----------------------------------"
-su - "$ACTUAL_USER" -c "crontab -l" | grep -A1 "Camera Platform" || echo "No camera platform cron jobs found"
+sudo -u "$ACTUAL_USER" crontab -l | grep -A1 "Camera Platform" || echo "No camera platform cron jobs found"
 echo "-----------------------------------"
 echo ""
 
@@ -185,7 +195,7 @@ if [ -f "$PROJECT_ROOT/tools/health_check_and_restart.sh" ]; then
     chmod +x "$PROJECT_ROOT/tools/health_check_and_restart.sh"
 
     echo "   📌 Testing health check (this may take a few seconds)..."
-    if su - "$ACTUAL_USER" -c "$PROJECT_ROOT/tools/health_check_and_restart.sh" >/dev/null 2>&1; then
+    if sudo -u "$ACTUAL_USER" "$PROJECT_ROOT/tools/health_check_and_restart.sh" >/dev/null 2>&1; then
         echo "   ✅ Health check script executed successfully"
     else
         echo "   ⚠️  Health check script encountered issues (check logs/health_check.log)"
@@ -220,7 +230,7 @@ echo "   ✓ Health check cron job (every 12 minutes)"
 echo "   ✓ Scheduled restart cron job (every 8 hours)"
 echo ""
 echo "📌 Systemd Service Status:"
-su - "$ACTUAL_USER" -c "systemctl --user status camera-platform.service --no-pager" || true
+sudo -u "$ACTUAL_USER" XDG_RUNTIME_DIR="/run/user/$(id -u $ACTUAL_USER)" systemctl --user status camera-platform.service --no-pager 2>/dev/null || echo "   (Run 'systemctl --user status camera-platform.service' to check status)"
 echo ""
 echo "📌 Next Steps:"
 echo "   1. Services will auto-start on next boot"
