@@ -201,6 +201,12 @@ stop_server() {
     local name=$1
     local pid_file="$PID_DIR/${name}.pid"
 
+    # For dashboard_server, also check gunicorn.pid
+    local gunicorn_pid_file="$PID_DIR/gunicorn.pid"
+    if [ "$name" = "dashboard_server" ] && [ -f "$gunicorn_pid_file" ]; then
+        pid_file="$gunicorn_pid_file"
+    fi
+
     if [ -f "$pid_file" ]; then
         local pid=$(cat "$pid_file")
         if ps -p "$pid" > /dev/null 2>&1; then
@@ -242,6 +248,11 @@ stop_server() {
                 fi
             fi
             rm "$pid_file"
+            # Also remove both PID files for dashboard_server
+            if [ "$name" = "dashboard_server" ]; then
+                rm "$PID_DIR/dashboard_server.pid" 2>/dev/null
+                rm "$PID_DIR/gunicorn.pid" 2>/dev/null
+            fi
         else
             rm "$pid_file"
         fi
