@@ -500,6 +500,8 @@ class CameraDatabaseManager:
 
             # Build dynamic UPDATE query based on provided kwargs
             valid_fields = [
+                'camera_name', 'activity_type', 'start_timestamp', 'confidence',
+                'end_timestamp', 'duration_seconds',
                 'recording_filename', 'recording_path', 'recording_size',
                 'thumbnail_path', 'upload_status', 'processed',
                 'slack_ts', 'slack_channel', 'slack_notified',
