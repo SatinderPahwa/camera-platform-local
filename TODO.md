@@ -2,7 +2,23 @@
 
 ## High Priority
 
-### 1. Fix REMB Loopback Trap
+### 1. ✅ COMPLETED - Fix Recording Deletion in Admin Dashboard (Feature Bug)
+
+**Issue:**
+- The delete old recordings functionality in the admin dashboard did not work
+- Missing backend script: `tools/cleanup_old_recordings.py`
+
+**Solution Implemented:**
+- ✅ Copied proven working script from reference project
+- ✅ Handles recordings and thumbnails
+- ✅ Scans for orphaned files (not in database)
+- ✅ Handles both files and directories
+- ✅ Runs VACUUM to optimize database after deletion
+- ✅ Proper statistics for dashboard parsing
+
+**Status:** ✅ **COMPLETE** - Admin dashboard recording deletion now functional
+
+### 2. Fix REMB Loopback Trap
 
 **Current Issue:**
 - The camera starts streaming but times out after ~10 seconds because it doesn't receive RTCP feedback packets from the Kurento Media Server.
@@ -18,9 +34,9 @@
 - The `build_custom_sdp_offer` function in `sdp_processor.py` should be modified to accept an IP address and use it in the `o=` and `c=` lines of the SDP.
 - The `start_stream` method in `stream_manager.py` should be updated to pass the correct IP to this function.
 
-**Status:** Not started. This is the next critical fix.
+**Status:** Not started. To be addressed after recording deletion bug is fixed.
 
-### 2. ✅ COMPLETED - Address SSL Private Key Permissions (Security Vulnerability)
+### 3. ✅ COMPLETED - Address SSL Private Key Permissions (Security Vulnerability)
 
 **Solution Implemented:** Group ownership with automated management
 
@@ -59,7 +75,7 @@
 
 **Status:** ✅ **COMPLETE** - Running in production on camera1
 
-### 4. Re-enable and Configure Firewall
+### 5. Re-enable and Configure Firewall
 
 **Current Issue:**
 - The `ufw` firewall on the server was disabled as a temporary measure to diagnose the RTP/RTCP issue.
