@@ -172,7 +172,8 @@ else
     echo "   ✅ Added scheduled restart cron job (8 AM, 4 PM, Midnight)"
 fi
 
-# Install crontab
+# Install crontab (make temp file readable by user first)
+chmod 644 "$TEMP_CRON"
 sudo -u "$ACTUAL_USER" crontab "$TEMP_CRON"
 rm "$TEMP_CRON"
 echo ""
