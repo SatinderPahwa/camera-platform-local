@@ -85,7 +85,7 @@ class SDPProcessor:
             f"a=rtcp:{media_info.audio_port + 1}",  # Explicitly specify camera's audio RTCP port
             "a=rtpmap:96 opus/48000/2",
             "a=rtpmap:0 PCMU/8000",
-            "a=sendrecv",  # CRITICAL: sendrecv tells Kurento to send RTCP feedback to camera
+            "a=sendrecv",  # Audio is bidirectional (matches original Hive)
             f"a=ssrc:{media_info.audio_ssrc} cname:{media_info.cname}",
             # Video media
             f"m=video {media_info.video_port} RTP/AVPF 103",
@@ -96,7 +96,7 @@ class SDPProcessor:
             "a=rtcp-fb:103 nack pli",
             "a=rtcp-fb:103 goog-remb",
             "a=rtcp-fb:103 ccm fir",
-            "a=sendrecv",  # CRITICAL: sendrecv tells Kurento to send RTCP feedback to camera
+            "a=sendonly",  # Camera only sends video, doesn't receive (Kurento will respond with recvonly)
             f"a=ssrc:{media_info.video_ssrc} cname:{media_info.cname}",
             # NOTE: x-skl attributes are NOT in the offer, only in the answer!
             # POC2 adds them via enhance_answer() after Kurento processes the offer
