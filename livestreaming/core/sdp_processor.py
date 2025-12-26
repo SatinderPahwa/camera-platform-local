@@ -171,13 +171,30 @@ class SDPProcessor:
         ip_regex = r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
         enhanced = re.sub(ip_regex, external_ip, enhanced)
 
-        # Step 5: CRITICAL FIX - Change a=recvonly to a=sendrecv for RTCP bidirectional flow
-        # Even though RFC states RTCP should flow regardless of direction attribute,
-        # Kurento RtpEndpoint appears to not send RTCP packets when direction is recvonly.
-        # Original Hive implementation used a=sendrecv which enabled proper RTCP/REMB flow.
-        enhanced = enhanced.replace('a=recvonly', 'a=sendrecv')
+        # Step 5: Add a=direction:passive to video media (matching original Hive implementation)
+        # This tells the camera that Kurento is passive and camera should initiate media
+        lines = enhanced.split('\r\n')
+        result_lines = []
+        in_video = False
+        direction_added = False
 
-        logger.info(f"Enhanced SDP answer: replaced SSRCs with fixed Hive values ({media_info.audio_ssrc}, {media_info.video_ssrc}), added x-skl attributes, replaced IPs with {external_ip}, changed direction to sendrecv for RTCP")
+        for line in lines:
+            if line.startswith('m=video'):
+                in_video = True
+                direction_added = False
+            elif line.startswith('m='):
+                in_video = False
+
+            result_lines.append(line)
+
+            # Add a=direction:passive after a=recvonly in video section
+            if in_video and line == 'a=recvonly' and not direction_added:
+                result_lines.append('a=direction:passive')
+                direction_added = True
+
+        enhanced = '\r\n'.join(result_lines)
+
+        logger.info(f"Enhanced SDP answer: replaced SSRCs with fixed Hive values ({media_info.audio_ssrc}, {media_info.video_ssrc}), added x-skl attributes, replaced IPs with {external_ip}, added a=direction:passive to video")
         return enhanced
 
     def enhance_kurento_sdp_answer(
