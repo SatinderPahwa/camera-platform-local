@@ -18,23 +18,58 @@
 
 **Status:** ✅ **COMPLETE** - Admin dashboard recording deletion now functional
 
-### 2. Fix REMB Loopback Trap
+### 2. ⚠️ IN PROGRESS - Fix REMB Loopback Trap (RTCP Not Flowing)
 
 **Current Issue:**
-- The camera starts streaming but times out after ~10 seconds because it doesn't receive RTCP feedback packets from the Kurento Media Server.
-- `tcpdump` shows Kurento is sending the RTCP packets to its own loopback interface (`lo`) instead of to the camera's IP address over the physical network interface (`wlp2s0`).
+- Camera streams but doesn't receive RTCP/REMB feedback packets from Kurento Media Server
+- `tcpdump` shows **zero** packets from Kurento to camera (all traffic is one-way: camera → server)
+- Without REMB feedback, adaptive bitrate doesn't work (critical for external/cellular viewers)
 
-**Problem Analysis:**
-- This is a known issue with Kurento's `RtpEndpoint` when dealing with clients on the same subnet. It incorrectly identifies the camera as a "local" service.
-- The `WebRtcEndpoint.conf.ini` (`externalIPv4`, `networkInterfaces`) and `ufw` settings appear correct. The issue lies in how the `RtpEndpoint`'s SDP is negotiated.
+**Attempts Made:**
 
-**Proposed Solution (based on Kurento documentation):**
-- Modify `livestreaming/core/stream_manager.py` and `livestreaming/core/sdp_processor.py`.
-- The initial SDP offer sent to Kurento must contain the server's real LAN IP, not `0.0.0.0`.
-- The `build_custom_sdp_offer` function in `sdp_processor.py` should be modified to accept an IP address and use it in the `o=` and `c=` lines of the SDP.
-- The `start_stream` method in `stream_manager.py` should be updated to pass the correct IP to this function.
+1. ✅ **SDP Direction Fix (commit bf89c89):**
+   - Changed video offer to `a=sendonly` (was `a=sendrecv`)
+   - Audio kept as `a=sendrecv` (bidirectional)
+   - Enhanced answer adds `a=direction:passive` for video
+   - Result: SDP now matches original working Hive implementation
 
-**Status:** Not started. To be addressed after recording deletion bug is fixed.
+2. ✅ **IP Address Fix (commit d9bd15f):**
+   - Changed SDP offer o= and c= lines from `EXTERNAL_IP` to `0.0.0.0`
+   - Matches reference Hive AWS implementation (deharo-kcs-develop SessionDescription.java)
+   - Deployed to camera1 server via git pull on `fix-rtcp-direction-sendrecv` branch
+   - Result: **No change** - Kurento still doesn't send RTCP packets
+
+**Verification (Dec 26, 2025 19:35):**
+```bash
+# tcpdump showed 30 packets, ALL camera → server (192.168.199.124 → 192.168.199.218)
+# ZERO packets from server → camera
+# Expected: Bidirectional RTCP flow including REMB packets
+```
+
+**Root Cause Analysis:**
+- SDP configuration is now **perfect** (matches working reference)
+- Bandwidth settings configured correctly (5000 Kbps max, 500 Kbps min)
+- Bidirectional endpoint connections in place
+- **Problem persists despite matching reference implementation**
+
+**Hypothesis:**
+Network topology difference may be critical:
+- **Reference (AWS):** Camera and server on different networks → Kurento sends RTCP over internet
+- **Our setup:** Both on same subnet (192.168.199.x) → Kurento/GStreamer may handle routing differently
+- Possible GStreamer-level same-subnet routing issue in RtpEndpoint
+
+**Next Steps:**
+1. Test with camera on different subnet (separate VLAN or external network)
+2. Check Kurento RtpEndpoint documentation for same-subnet scenarios
+3. Consider alternative: Use WebRTC end-to-end instead of RTP → WebRTC conversion
+4. Investigate GStreamer RTP pipeline configuration for RTCP transmission
+
+**Files Modified:**
+- `livestreaming/core/sdp_processor.py:84,86` - Use 0.0.0.0 in SDP offer
+- `livestreaming/core/sdp_processor.py:88,99` - Correct media directions
+- `livestreaming/core/sdp_processor.py:174-198` - Add a=direction:passive
+
+**Status:** ⚠️ **BLOCKED** - Attempted fix from reference implementation didn't resolve issue. Requires deeper investigation into network topology or Kurento/GStreamer behavior with same-subnet RTP.
 
 ### 3. ✅ COMPLETED - Address SSL Private Key Permissions (Security Vulnerability)
 
