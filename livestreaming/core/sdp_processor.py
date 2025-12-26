@@ -73,12 +73,17 @@ class SDPProcessor:
         media_info = self._generate_media_info(audio_port, video_port, rtcp_port)
 
         # Build SDP offer
+        # CRITICAL: Use 0.0.0.0 in camera-facing SDP offer (not external_ip)
+        # This prevents Kurento from making incorrect routing assumptions about RTCP
+        # Kurento will route RTCP based on where RTP packets actually arrive from
+        # Reference: deharo-kcs-develop SessionDescription.java uses 0.0.0.0
+        # The answer sent to camera will still contain external_ip (handled by enhance_answer)
         sdp_lines = [
             "v=0",
             f"o=- {random.randint(1000000000, 9999999999)} "
-            f"{random.randint(1000000000, 9999999999)} IN IP4 {self.external_ip}",
+            f"{random.randint(1000000000, 9999999999)} IN IP4 0.0.0.0",
             "s=Camera Livestream",
-            f"c=IN IP4 {self.external_ip}",
+            f"c=IN IP4 0.0.0.0",
             "t=0 0",
             # Audio media
             f"m=audio {media_info.audio_port} RTP/AVPF 96 0",
