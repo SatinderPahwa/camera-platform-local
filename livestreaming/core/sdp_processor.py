@@ -168,7 +168,13 @@ class SDPProcessor:
         ip_regex = r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
         enhanced = re.sub(ip_regex, external_ip, enhanced)
 
-        logger.info(f"Enhanced SDP answer: replaced SSRCs with fixed Hive values ({media_info.audio_ssrc}, {media_info.video_ssrc}), added x-skl attributes, replaced IPs with {external_ip}")
+        # Step 5: CRITICAL FIX - Change a=recvonly to a=sendrecv for RTCP bidirectional flow
+        # Even though RFC states RTCP should flow regardless of direction attribute,
+        # Kurento RtpEndpoint appears to not send RTCP packets when direction is recvonly.
+        # Original Hive implementation used a=sendrecv which enabled proper RTCP/REMB flow.
+        enhanced = enhanced.replace('a=recvonly', 'a=sendrecv')
+
+        logger.info(f"Enhanced SDP answer: replaced SSRCs with fixed Hive values ({media_info.audio_ssrc}, {media_info.video_ssrc}), added x-skl attributes, replaced IPs with {external_ip}, changed direction to sendrecv for RTCP")
         return enhanced
 
     def enhance_kurento_sdp_answer(
