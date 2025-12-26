@@ -199,6 +199,7 @@ class StreamManager:
             # Step 3: Generate minimal SDP offer with port 9 for dynamic allocation
             logger.info("Generating minimal SDP offer...")
             minimal_offer, self.media_info = self.sdp_processor.build_custom_sdp_offer()
+            logger.info(f"DEBUG - SDP OFFER TO KURENTO:\n{minimal_offer}")
 
             # Step 4: Process offer with RtpEndpoint to get SDP answer with Kurento's actual ports
             logger.info("Processing SDP offer with RtpEndpoint to get actual ports...")
@@ -206,6 +207,7 @@ class StreamManager:
                 self.rtp_endpoint_id,
                 minimal_offer
             )
+            logger.info(f"DEBUG - SDP ANSWER FROM KURENTO:\n{sdp_answer}")
 
             # Step 5: CRITICAL - Set maxVideoRecvBandwidth on RtpEndpoint (triggers REMB to camera!)
             logger.info(f"Setting maxVideoRecvBandwidth on RtpEndpoint: {self.max_bandwidth} Kbps...")
@@ -226,6 +228,7 @@ class StreamManager:
                 self.external_ip,
                 self.media_info
             )
+            logger.info(f"DEBUG - ENHANCED SDP ANSWER TO CAMERA:\n{self.sdp_offer}")
 
             # Step 7: Send enhanced SDP answer to camera via MQTT
             logger.info("Sending enhanced SDP answer to camera via MQTT...")
