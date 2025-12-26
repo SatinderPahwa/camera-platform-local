@@ -82,12 +82,14 @@ class SDPProcessor:
             "t=0 0",
             # Audio media
             f"m=audio {media_info.audio_port} RTP/AVPF 96 0",
+            f"a=rtcp:{media_info.audio_port + 1}",  # Explicitly specify camera's audio RTCP port
             "a=rtpmap:96 opus/48000/2",
             "a=rtpmap:0 PCMU/8000",
             "a=sendonly",
             f"a=ssrc:{media_info.audio_ssrc} cname:{media_info.cname}",
             # Video media
             f"m=video {media_info.video_port} RTP/AVPF 103",
+            f"a=rtcp:{media_info.video_port + 1}",  # Explicitly specify camera's video RTCP port
             "a=rtpmap:103 H264/90000",
             "a=fmtp:103 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
             "a=rtcp-fb:103 nack",
@@ -102,9 +104,10 @@ class SDPProcessor:
 
         sdp_offer = "\r\n".join(sdp_lines) + "\r\n"
 
-        logger.info("Built custom SDP offer with Hive attributes")
+        logger.info("Built custom SDP offer with Hive attributes and explicit RTCP ports")
         logger.debug(f"Media info: audio_ssrc={media_info.audio_ssrc}, "
-                    f"video_ssrc={media_info.video_ssrc}, cname={media_info.cname}")
+                    f"video_ssrc={media_info.video_ssrc}, cname={media_info.cname}, "
+                    f"audio_rtcp={media_info.audio_port + 1}, video_rtcp={media_info.video_port + 1}")
 
         return sdp_offer, media_info
 
