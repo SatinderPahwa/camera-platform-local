@@ -331,10 +331,13 @@ class SignalingServer:
             await self.kurento_client.set_min_video_send_bandwidth(viewer_webrtc_id, 500)   # 500 Kbps
             logger.debug(f"Configured send bandwidth for viewer WebRtcEndpoint (500-5000 Kbps)")
 
-            # Connect camera's RtpEndpoint to viewer's WebRtcEndpoint
-            # Architecture matching POC2: RtpEndpoint (camera) → WebRtcEndpoint (viewer)
+            # Connect endpoints BIDIRECTIONALLY (required for REMB propagation!)
+            # Architecture matching reference:
+            # 1. RtpEndpoint → WebRtcEndpoint (camera media to viewer)
+            # 2. WebRtcEndpoint → RtpEndpoint (REMB feedback to camera)
             await self.kurento_client.connect_endpoints(camera_rtp_endpoint_id, viewer_webrtc_id)
-            logger.debug(f"Connected camera's RTP endpoint to viewer's WebRTC endpoint")
+            await self.kurento_client.connect_endpoints(viewer_webrtc_id, camera_rtp_endpoint_id)
+            logger.debug(f"Connected camera's RTP endpoint ← → viewer's WebRTC endpoint (bidirectional for REMB)")
 
             # Create viewer session BEFORE gathering candidates
             # (ICE events fire immediately and need to find the viewer)
