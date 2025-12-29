@@ -91,6 +91,7 @@ class SDPProcessor:
             "a=rtpmap:96 opus/48000/2",
             "a=rtpmap:0 PCMU/8000",
             "a=sendrecv",  # Audio is bidirectional (matches original Hive)
+            "a=direction:active",  # CRITICAL for REMB: offer must be active, answer passive
             f"a=ssrc:{media_info.audio_ssrc} cname:{media_info.cname}",
             # Video media
             f"m=video {media_info.video_port} RTP/AVPF 103",
@@ -102,6 +103,7 @@ class SDPProcessor:
             "a=rtcp-fb:103 goog-remb",
             "a=rtcp-fb:103 ccm fir",
             "a=sendonly",  # Camera only sends video, doesn't receive (Kurento will respond with recvonly)
+            "a=direction:active",  # CRITICAL for REMB: offer must be active, answer passive
             f"a=ssrc:{media_info.video_ssrc} cname:{media_info.cname}",
             # NOTE: x-skl attributes are NOT in the offer, only in the answer!
             # POC2 adds them via enhance_answer() after Kurento processes the offer
@@ -141,6 +143,14 @@ class SDPProcessor:
             Enhanced SDP answer string ready to send to camera
         """
         import re
+
+        # Step 0: CRITICAL VALIDATION - Check for REMB support (matching AWS implementation)
+        # If Kurento's answer doesn't contain "a=direction:passive", REMB won't work
+        if "a=direction:passive" not in sdp_answer:
+            logger.warning("⚠️ Answer from RtpEndpoint does NOT contain 'a=direction:passive' - REMB may not work!")
+            logger.warning("This indicates Kurento may not be configured to send RTCP/REMB feedback")
+        else:
+            logger.info("✅ Answer contains 'a=direction:passive' - REMB should be supported")
 
         # Step 1: DO NOT change session name! POC2 keeps "s=Kurento Media Server" as-is
         enhanced = sdp_answer
