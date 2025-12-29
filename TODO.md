@@ -18,26 +18,60 @@
 
 **Status:** ✅ **COMPLETE** - Admin dashboard recording deletion now functional
 
-### 2. ⚠️ IN PROGRESS - Fix REMB Loopback Trap (RTCP Not Flowing)
+### 2. ⚠️ PAUSED - Fix REMB Loopback Trap (RTCP Not Flowing)
 
 **Current Issue:**
 - Camera streams but doesn't receive RTCP/REMB feedback packets from Kurento Media Server
 - `tcpdump` shows **zero** packets from Kurento to camera (all traffic is one-way: camera → server)
 - Without REMB feedback, adaptive bitrate doesn't work (critical for external/cellular viewers)
+- **System WAS working in October 2025** (camera logs showed bitrate updates every 5 seconds)
+- Issue existed BEFORE Dec 26, 2025 - all fixes below were attempts to resolve pre-existing problem
 
-**Attempts Made:**
+**Current Branch:** `fix-rtcp-remb-config` (created Dec 29, 2025)
+**Previous Branch:** `fix-rtcp-direction-sendrecv` (Dec 26, 2025 - all attempts failed)
 
-1. ✅ **SDP Direction Fix (commit bf89c89):**
-   - Changed video offer to `a=sendonly` (was `a=sendrecv`)
-   - Audio kept as `a=sendrecv` (bidirectional)
+**All Attempts Made (Dec 26, 2025 on fix-rtcp-direction-sendrecv) - None Resolved Issue:**
+
+1. **Commit cef1cd1:** Changed direction from `recvonly` to `sendrecv` for RTCP flow
+   - Result: ❌ No change
+
+2. **Commit a0fa972:** Added explicit `a=rtcp:{port+1}` attributes in offer to Kurento
+   - Result: ❌ No change
+
+3. **Commit 74f5161:** Added bidirectional endpoint connection for REMB propagation
+   - Result: ❌ No change
+
+4. **Commit 0066f77:** Changed offer direction from `sendonly` to `sendrecv`
+   - Result: ❌ No change
+
+5. **Commit 7d478cf:** Added SDP offer/answer logging to diagnose RTCP issue
+   - Result: ❌ Diagnostic only, no fix
+
+6. **Commit 724cc96:** Matched original Hive SDP - keep `recvonly` and add `direction:passive`
+   - Result: ❌ No change
+
+7. **Commit bf89c89:** Corrected offer directions - audio `sendrecv`, video `sendonly`
    - Enhanced answer adds `a=direction:passive` for video
-   - Result: SDP now matches original working Hive implementation
+   - Result: ❌ No change
 
-2. ✅ **IP Address Fix (commit d9bd15f):**
-   - Changed SDP offer o= and c= lines from `EXTERNAL_IP` to `0.0.0.0`
+8. **Commit d9bd15f:** Changed SDP offer o= and c= lines from `EXTERNAL_IP` to `0.0.0.0`
    - Matches reference Hive AWS implementation (deharo-kcs-develop SessionDescription.java)
-   - Deployed to camera1 server via git pull on `fix-rtcp-direction-sendrecv` branch
-   - Result: **No change** - Kurento still doesn't send RTCP packets
+   - Result: ❌ No change
+
+9. **Commit 90ab03c:** Documentation update confirming 0.0.0.0 fix didn't work
+
+**Current SDP Configuration (after all attempts):**
+```python
+# Offer to Kurento:
+o=- {random} {random} IN IP4 0.0.0.0
+c=IN IP4 0.0.0.0
+m=audio {port} RTP/AVPF 96 0
+a=rtcp:{port+1}
+a=sendrecv
+m=video {port} RTP/AVPF 103
+a=rtcp:{port+1}
+a=sendonly
+```
 
 **Verification (Dec 26, 2025 19:35):**
 ```bash
@@ -46,30 +80,55 @@
 # Expected: Bidirectional RTCP flow including REMB packets
 ```
 
-**Root Cause Analysis:**
-- SDP configuration is now **perfect** (matches working reference)
-- Bandwidth settings configured correctly (5000 Kbps max, 500 Kbps min)
-- Bidirectional endpoint connections in place
-- **Problem persists despite matching reference implementation**
+**New Attempts (Dec 29, 2025 on fix-rtcp-remb-config) - Testing in Progress:**
 
-**Hypothesis:**
-Network topology difference may be critical:
-- **Reference (AWS):** Camera and server on different networks → Kurento sends RTCP over internet
-- **Our setup:** Both on same subnet (192.168.199.x) → Kurento/GStreamer may handle routing differently
-- Possible GStreamer-level same-subnet routing issue in RtpEndpoint
+10. **Branch `fix-rtcp-remb-config` created** - New approach targeting Kurento config instead of SDP
+    - Created `BaseRtpEndpoint.conf.ini` with explicit REMB configuration
+    - `rembLocalActivation=true` - Enable REMB packets to camera
+    - `rembOnConnect=5000000` - 5 Mbps initial bitrate
+    - `rembMinBitrate=500000` - 500 Kbps minimum
+    - Updated `start_kurento.sh` to mount config file into Kurento container
+    - **Issue:** Kurento entrypoint modifies config causing "Device or resource busy" on restart
+    - **Workaround:** Clean `minPort`/`maxPort` from config before each restart
+    - **Test Result (first test):** ❌ tcpdump showed only one-way traffic (camera → server), no RTCP back to camera
+    - Created `rollback_remb_fix.sh` for quick rollback if needed
 
-**Next Steps:**
-1. Test with camera on different subnet (separate VLAN or external network)
-2. Check Kurento RtpEndpoint documentation for same-subnet scenarios
-3. Consider alternative: Use WebRTC end-to-end instead of RTP → WebRTC conversion
-4. Investigate GStreamer RTP pipeline configuration for RTCP transmission
+11. **Commit 7318bf6:** Added STUN/TURN configuration to BaseRtpEndpoint for RTCP routing
+    - `networkInterfaces=all` - Explicit network interface configuration
+    - `externalIPv4=192.168.199.173` - External IP for RTCP routing
+    - `stunServerAddress=stun.l.google.com` - STUN server for NAT traversal
+    - `stunServerPort=19302`
+    - Matches WebRtcEndpoint STUN/TURN settings for consistency
+    - **Status:** ⏳ Ready to test - services restarted, need to capture packets
+
+**Environment Details:**
+- **Server:** camera1 (192.168.199.173) - Mac
+- **Camera:** 192.168.199.124 (corrected from 192.168.199.167)
+- **Kurento:** 6.16.0 in Docker with `--network host`
+- **Kurento Ports:** 5000-5050 (via `KMS_MIN_PORT`/`KMS_MAX_PORT` env vars)
+- **Network:** Both on same subnet (192.168.199.x)
+- **BaseRtpEndpoint.conf.ini:** NOW MOUNTED with REMB + STUN/TURN configuration
+
+**Configuration Comparison:**
+| Aspect | October 2025 (Working) | Dec 26 2025 (After Fixes) |
+|--------|------------------------|---------------------------|
+| SDP o=/c= | `IN IP4 {external_ip}` | `IN IP4 0.0.0.0` |
+| Audio direction | `a=sendonly` | `a=sendrecv` |
+| Video direction | `a=sendonly` | `a=sendonly` |
+| Explicit a=rtcp: | Not present | Added for audio/video |
+| Kurento ports | 5000-5050 | 5000-5050 (unchanged) |
+
+**Open Questions:**
+1. What changed between October 2025 (working) and when it stopped working?
+2. Is the issue related to network topology (same subnet)?
+3. Does Kurento RtpEndpoint have specific requirements for RTCP routing?
+4. Could the issue be in Kurento/GStreamer configuration rather than SDP?
 
 **Files Modified:**
-- `livestreaming/core/sdp_processor.py:84,86` - Use 0.0.0.0 in SDP offer
-- `livestreaming/core/sdp_processor.py:88,99` - Correct media directions
-- `livestreaming/core/sdp_processor.py:174-198` - Add a=direction:passive
+- `livestreaming/core/sdp_processor.py` - Multiple SDP changes (see commits above)
+- `livestreaming/core/stream_manager.py` - Bidirectional endpoint connections
 
-**Status:** ⚠️ **BLOCKED** - Attempted fix from reference implementation didn't resolve issue. Requires deeper investigation into network topology or Kurento/GStreamer behavior with same-subnet RTP.
+**Status:** ⚠️ **PAUSED** - Multiple fix attempts based on reference implementation did not resolve issue. Need fresh approach to identify root cause. Issue pre-dates all Dec 26 changes.
 
 ### 3. ✅ COMPLETED - Address SSL Private Key Permissions (Security Vulnerability)
 
