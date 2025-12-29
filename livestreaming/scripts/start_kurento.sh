@@ -108,13 +108,11 @@ else
             -p ${WS_PORT}:${WS_PORT}/udp \
             -p 5000-5050:5000-5050/udp \
             -v "${CONFIG_DIR}/WebRtcEndpoint.conf.ini:/etc/kurento/modules/kurento/WebRtcEndpoint.conf.ini:Z" \
-            -v "${CONFIG_DIR}/BaseRtpEndpoint.conf.ini:/etc/kurento/modules/kurento/BaseRtpEndpoint.conf.ini:Z" \
             -e KMS_MIN_PORT=5000 \
             -e KMS_MAX_PORT=5050 \
             -e GST_DEBUG=3,Kurento*:4 \
             ${IMAGE}
-        # REMB_FIX: Added BaseRtpEndpoint.conf.ini mount above to enable REMB feedback
-        # ROLLBACK: Remove the BaseRtpEndpoint mount line to revert
+        # Note: BaseRtpEndpoint.conf.ini NOT mounted - using SDP approach for REMB instead
     else
         # Linux: use host network for better performance
         echo "Detected Linux: using host network"
@@ -123,13 +121,11 @@ else
             --name ${CONTAINER_NAME} \
             --network host \
             -v "${CONFIG_DIR}/WebRtcEndpoint.conf.ini:/etc/kurento/modules/kurento/WebRtcEndpoint.conf.ini:Z" \
-            -v "${CONFIG_DIR}/BaseRtpEndpoint.conf.ini:/etc/kurento/modules/kurento/BaseRtpEndpoint.conf.ini:Z" \
             -e KMS_MIN_PORT=5000 \
             -e KMS_MAX_PORT=5050 \
             -e GST_DEBUG=3,Kurento*:4 \
             ${IMAGE}
-        # REMB_FIX: Added BaseRtpEndpoint.conf.ini mount above to enable REMB feedback
-        # ROLLBACK: Remove the BaseRtpEndpoint mount line to revert
+        # Note: BaseRtpEndpoint.conf.ini NOT mounted - using SDP approach for REMB instead
     fi
 
     echo "✅ Container created and started"
