@@ -30,17 +30,17 @@ BACKUP_DIR="$BACKUP_ROOT/system/$BACKUP_DATE"
 LATEST_LINK="$BACKUP_ROOT/system/latest"
 LOG_FILE="$BACKUP_ROOT/system/backup_$BACKUP_DATE.log"
 
+# Create backup directory structure first (before logging)
+mkdir -p "$BACKUP_DIR"
+mkdir -p "$BACKUP_ROOT/metadata"
+mkdir -p "$BACKUP_ROOT/application"
+
 echo "======================================================================" | tee -a "$LOG_FILE"
 echo "CAMERA PLATFORM SERVER BACKUP" | tee -a "$LOG_FILE"
 echo "======================================================================" | tee -a "$LOG_FILE"
 echo "Started: $(date)" | tee -a "$LOG_FILE"
 echo "Destination: $BACKUP_DIR" | tee -a "$LOG_FILE"
 echo "" | tee -a "$LOG_FILE"
-
-# Create backup directory structure
-mkdir -p "$BACKUP_DIR"
-mkdir -p "$BACKUP_ROOT/metadata"
-mkdir -p "$BACKUP_ROOT/application"
 
 # Rsync options explained:
 # -a (archive) = preserve permissions, times, symlinks, etc.
