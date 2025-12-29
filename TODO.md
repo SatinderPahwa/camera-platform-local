@@ -18,7 +18,7 @@
 
 **Status:** ✅ **COMPLETE** - Admin dashboard recording deletion now functional
 
-### 2. ⚠️ PAUSED - Fix REMB Loopback Trap (RTCP Not Flowing)
+### 2. ✅ COMPLETED - Fix REMB Loopback Trap (RTCP Not Flowing)
 
 **Current Issue:**
 - Camera streams but doesn't receive RTCP/REMB feedback packets from Kurento Media Server
@@ -140,7 +140,7 @@ a=sendonly
 - `livestreaming/core/sdp_processor.py` - Multiple SDP changes (see commits above)
 - `livestreaming/core/stream_manager.py` - Bidirectional endpoint connections
 
-**Status:** ⚠️ **PAUSED** - Multiple fix attempts based on reference implementation did not resolve issue. Need fresh approach to identify root cause. Issue pre-dates all Dec 26 changes.
+**Status:** ✅ **COMPLETE** - **RESOLVED on Dec 29, 2025** with AWS SDP format fix (commit 003d586). Adding `a=direction:active` to SDP offer enables Kurento to respond with `a=direction:passive`, which activates REMB feedback. Camera now receives RTCP packets and adjusts bitrate dynamically (verified in camera logs). Adaptive bitrate working perfectly!
 
 ### 3. ✅ COMPLETED - Address SSL Private Key Permissions (Security Vulnerability)
 
