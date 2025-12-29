@@ -99,7 +99,19 @@ a=sendonly
     - `stunServerAddress=stun.l.google.com` - STUN server for NAT traversal
     - `stunServerPort=19302`
     - Matches WebRtcEndpoint STUN/TURN settings for consistency
-    - **Status:** ⏳ Ready to test - services restarted, need to capture packets
+    - **Test Result:** ❌ Comprehensive tcpdump showed Kurento CAN send packets (159 out to viewer 192.168.199.173), but ZERO packets to camera (192.168.199.124)
+    - **Conclusion:** Not a capability issue - Kurento doesn't know to send RTCP to camera
+
+12. **Branch `fix-rtcp-sdp-aws-format` created (Dec 29, 2025)** - AWS SDP format implementation
+    - **Root Cause Found:** Examined original AWS code in `/Users/satinder/Documents/camera/mqtt/src/deharo-kcs-develop`
+    - **Discovery:** Camera.java validates `if (!endPointAnswer.contains("a=direction:passive"))`
+    - **Issue:** We were missing `a=direction:active` in SDP OFFER (AWS implementation has it)
+    - **Fix Applied:** Modified `livestreaming/core/sdp_processor.py`
+      - Added `a=direction:active` to audio media section (line 94)
+      - Added `a=direction:active` to video media section (line 106)
+      - Added validation check for `a=direction:passive` in Kurento's answer (lines 147-153)
+    - **Matches:** Original AWS implementation in SDPAttributes.java and VideoMediaDescription.java
+    - **Status:** ⏳ Code deployed to server, service restarted, ready for packet capture testing
 
 **Environment Details:**
 - **Server:** camera1 (192.168.199.173) - Mac
