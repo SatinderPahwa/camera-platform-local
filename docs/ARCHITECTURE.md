@@ -8,6 +8,7 @@ System design and technical architecture of the VBC01 Camera Platform (EMQX Edit
 - [System Architecture](#system-architecture)
 - [Components](#components)
 - [Data Flow](#data-flow)
+- [Livestreaming Architecture](#livestreaming-architecture)
 - [Certificate Model](#certificate-model)
 - [MQTT Topics](#mqtt-topics)
 - [Database Schema](#database-schema)
@@ -279,6 +280,220 @@ emqx ctl listeners       # Show listeners
 6. MQTT Processor receives update → Updates database
 7. Dashboard refreshes → Shows new mode
 ```
+
+## Livestreaming Architecture
+
+### Overview
+
+The livestreaming system enables real-time video streaming from VBC01 cameras through a WebRTC-based architecture using Kurento Media Server. The system handles SDP (Session Description Protocol) negotiation, RTP/RTCP media transport, and adaptive bitrate control via REMB (Receiver Estimated Maximum Bitrate) feedback.
+
+### Components
+
+```
+┌─────────────────┐         WebSocket          ┌──────────────────────┐
+│  Web Browser    │◄──────────────────────────►│  Signaling Server    │
+│  (WebRTC)       │         SDP Offer/Answer   │  (Port 8765 WSS)     │
+└─────────────────┘                             └──────────┬───────────┘
+        ↑                                                  │
+        │ SRTP/SRTCP                                      │ Kurento API
+        │ (via TURN)                                       │
+        ↓                                                  ↓
+┌─────────────────┐                             ┌──────────────────────┐
+│  CoTURN Server  │◄────────────────────────────│  Kurento Media       │
+│  (STUN/TURN)    │         RTP Relay           │  Server (KMS)        │
+│  Port 3478/5349 │                             │  Docker Container    │
+└─────────────────┘                             └──────────┬───────────┘
+                                                           │
+                                                           │ RTP/RTCP
+                                                           │ REMB Feedback
+                                                           ↓
+                                                  ┌──────────────────────┐
+                                                  │  VBC01 Camera        │
+                                                  │  (192.168.199.x)     │
+                                                  │  Ports 5000-5050     │
+                                                  └──────────────────────┘
+```
+
+### Adaptive Bitrate Control (REMB)
+
+**REMB (Receiver Estimated Maximum Bitrate)** is critical for streaming quality, especially for external/cellular viewers. Without REMB feedback, cameras cannot adjust their bitrate based on network conditions.
+
+#### How REMB Works
+
+1. **Camera** streams video at initial bitrate (e.g., 5 Mbps)
+2. **Kurento** receives stream and estimates available bandwidth
+3. **Kurento** sends RTCP REMB packets back to camera with recommended bitrate
+4. **Camera** adjusts encoding bitrate (visible in camera logs every 5 seconds)
+5. Loop continues - camera adapts to changing network conditions
+
+#### REMB Fix (December 2025)
+
+**Problem:** Camera was streaming but not receiving RTCP/REMB feedback from Kurento. `tcpdump` showed zero packets from Kurento → camera (all traffic was one-way: camera → server). Without REMB, adaptive bitrate didn't work.
+
+**Root Cause:** Missing `a=direction:active` attribute in SDP offer to Kurento.
+
+The VBC01 camera firmware (based on AWS implementation) validates that Kurento's answer contains `a=direction:passive`. This attribute pairing is required for REMB feedback:
+- **Offer must contain:** `a=direction:active`
+- **Answer must contain:** `a=direction:passive`
+
+This handshake signals that both sides support bidirectional RTCP feedback.
+
+**Solution Implemented:**
+
+Modified `livestreaming/core/sdp_processor.py` to add `a=direction:active` to both audio and video media sections in the SDP offer:
+
+```python
+# Audio media section (line 94)
+"a=sendrecv",           # Audio is bidirectional
+"a=direction:active",   # CRITICAL for REMB: offer must be active
+
+# Video media section (line 106)
+"a=sendonly",           # Camera only sends video
+"a=direction:active",   # CRITICAL for REMB: offer must be active
+```
+
+Added validation in `enhance_answer()` to verify Kurento responds correctly:
+
+```python
+if "a=direction:passive" not in sdp_answer:
+    logger.warning("⚠️ Answer does NOT contain 'a=direction:passive' - REMB may not work!")
+else:
+    logger.info("✅ Answer contains 'a=direction:passive' - REMB should be supported")
+```
+
+**Result:** ✅ Camera now receives RTCP packets and adjusts bitrate dynamically. Verified in camera logs showing bitrate updates every 5 seconds. Adaptive bitrate working perfectly!
+
+**Files Modified:**
+- `livestreaming/core/sdp_processor.py` - Added `a=direction:active` to offer (lines 94, 106)
+- `livestreaming/core/sdp_processor.py` - Added validation in `enhance_answer()` (lines 147-153)
+
+**Verification:**
+```bash
+# Capture RTCP packets on server
+sudo tcpdump -i any -n "host <camera_ip> and (udp portrange 5000-5050)" -v
+
+# Expected: Bidirectional traffic including RTCP packets from server → camera
+
+# Check camera logs for bitrate adjustments
+# Should see: "bitrate updated to X bps" every ~5 seconds
+```
+
+### SDP Negotiation Flow
+
+```
+1. Browser → Signaling Server: Request stream
+2. Signaling Server → Kurento: Create RtpEndpoint
+3. Signaling Server → Camera (via MQTT): Start streaming
+4. Camera → Signaling Server: WebSocket connection with camera details
+5. Signaling Server builds custom SDP offer:
+   - Fixed SSRCs for audio/video
+   - Explicit RTCP ports (port+1)
+   - Direction attributes (a=direction:active)
+   - Camera's IP and RTP ports
+6. Signaling Server → Kurento: processOffer(sdp)
+7. Kurento → Signaling Server: SDP answer with:
+   - Server IP and ports
+   - Direction attributes (a=direction:passive)
+   - REMB support confirmation
+8. Signaling Server enhances answer:
+   - Replaces Kurento's SSRCs with camera's fixed SSRCs
+   - Adds Hive-specific x-skl attributes
+   - Validates REMB support
+9. Signaling Server → Camera: Enhanced SDP answer
+10. Camera starts RTP stream to Kurento
+11. Kurento starts RTCP/REMB feedback to camera
+12. Media flows: Camera → Kurento → Browser (via TURN)
+```
+
+### Critical SDP Attributes
+
+**In Offer (to Kurento):**
+```
+o=- {random} {random} IN IP4 0.0.0.0
+c=IN IP4 0.0.0.0
+m=audio {port} RTP/AVPF 96 0
+a=rtcp:{port+1}                 # Explicit RTCP port
+a=sendrecv                      # Bidirectional audio
+a=direction:active              # Enable REMB feedback
+
+m=video {port} RTP/AVPF 103
+a=rtcp:{port+1}                 # Explicit RTCP port
+a=rtcp-fb:103 goog-remb         # REMB support
+a=sendonly                      # Unidirectional video
+a=direction:active              # Enable REMB feedback
+```
+
+**In Answer (from Kurento):**
+```
+a=direction:passive             # REMB confirmation
+a=recvonly                      # Kurento receives video
+a=ssrc:{camera_ssrc}            # Fixed SSRC (replaced by enhance_answer)
+```
+
+### Port Configuration
+
+**Camera Ports:** 5000-5050 (configured in camera database)
+**Kurento Ports:** 5000-5050 (configured via `KMS_MIN_PORT`/`KMS_MAX_PORT` environment variables)
+**TURN Ports:** 3478 (STUN), 5349 (TURNS), 49152-65535 (UDP relay)
+
+### Kurento Media Server
+
+**Version:** 6.16.0
+**Network Mode:** `--network host` (Docker)
+**Configuration:** BaseRtpEndpoint with REMB + STUN/TURN settings
+
+**Key Settings:**
+- `rembLocalActivation=true` - Enable REMB packets
+- `rembOnConnect=5000000` - 5 Mbps initial bitrate
+- `rembMinBitrate=500000` - 500 Kbps minimum
+- `networkInterfaces=all` - All network interfaces
+- `externalIPv4=<server_ip>` - External IP for RTCP routing
+
+**Management:**
+```bash
+# Start Kurento container
+./livestreaming/scripts/start_kurento.sh
+
+# Check status
+docker ps | grep kms-production
+
+# View logs
+docker logs kms-production --tail 100 -f
+```
+
+### Troubleshooting REMB Issues
+
+**Symptom:** Camera streams but bitrate doesn't adjust
+
+**Diagnosis:**
+```bash
+# 1. Capture RTCP packets
+sudo tcpdump -i any -n "host <camera_ip> and (udp portrange 5000-5050)" -v
+
+# 2. Check for bidirectional traffic
+# Expected: Packets in BOTH directions (camera → server AND server → camera)
+
+# 3. Check Kurento logs for REMB
+docker logs kms-production | grep -i remb
+
+# 4. Verify SDP contains direction attributes
+# Check signaling server logs for:
+# "✅ Answer contains 'a=direction:passive' - REMB should be supported"
+```
+
+**Common Issues:**
+
+1. **Missing `a=direction:active` in offer** → No REMB feedback
+   - Fix: Ensure sdp_processor.py includes direction attributes
+
+2. **Kurento not configured for REMB** → No RTCP packets sent
+   - Fix: Mount BaseRtpEndpoint.conf.ini with REMB settings
+
+3. **Firewall blocking RTCP** → One-way traffic only
+   - Fix: Allow UDP ports 5000-5050 in both directions
+
+4. **Wrong Kurento endpoint** → Using WebRtcEndpoint instead of RtpEndpoint
+   - Fix: Use RtpEndpoint for camera streams (WebRtcEndpoint is for browsers)
 
 ## Certificate Model
 
