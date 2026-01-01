@@ -710,8 +710,8 @@ reboot
 The platform uses a **shared certificate model**:
 - All cameras use the same MQTT client certificates
 - The CA certificate is identical across all cameras
-- Each camera is identified by its unique Camera ID (not by certificate)
-- The `master_ctrl.db` is only needed if you want to override server configuration
+- The `master_ctrl.db` contains server configuration (same for all cameras)
+- Each camera is identified by its unique Camera ID (not by certificate or database)
 
 ### Quick Steps for Camera 2, 3, 4, etc.
 
@@ -731,6 +731,8 @@ ftp> get mqtt.pem
 ftp> get mqtt.key
 ftp> cd /etc/ssl/certs
 ftp> get ca-bundle.trust.crt
+ftp> cd /cali
+ftp> get master_ctrl.db
 ftp> quit
 
 # Step 3: Connect to NEW camera via FTP
@@ -744,6 +746,8 @@ ftp> put mqtt.pem
 ftp> put mqtt.key
 ftp> cd /etc/ssl/certs
 ftp> put ca-bundle.trust.crt
+ftp> cd /cali
+ftp> put master_ctrl.db
 ftp> quit
 ```
 
@@ -755,6 +759,7 @@ ftp> quit
 | `mqtt.pem` | MQTT client certificate + key | `/root/certs/mqtt.pem` | `/root/certs/mqtt.pem` | ~3-4 KB |
 | `mqtt.key` | MQTT client private key | `/root/certs/mqtt.key` | `/root/certs/mqtt.key` | ~1.7 KB |
 | `ca-bundle.trust.crt` | System CA bundle (for HTTPS config server) | `/etc/ssl/certs/ca-bundle.trust.crt` | `/etc/ssl/certs/ca-bundle.trust.crt` | ~200 KB |
+| `master_ctrl.db` | Camera database (server configuration) | `/cali/master_ctrl.db` | `/cali/master_ctrl.db` | ~500 KB |
 
 **Step 5: Reboot the new camera**
 

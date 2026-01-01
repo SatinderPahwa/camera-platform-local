@@ -88,6 +88,7 @@ If you've already set up one camera, you can **reuse the same certificate files*
 | `mqtt.pem` | `/root/certs/mqtt.pem` | `/root/certs/mqtt.pem` |
 | `mqtt.key` | `/root/certs/mqtt.key` | `/root/certs/mqtt.key` |
 | `ca-bundle.trust.crt` | `/etc/ssl/certs/ca-bundle.trust.crt` | `/etc/ssl/certs/ca-bundle.trust.crt` |
+| `master_ctrl.db` | `/cali/master_ctrl.db` | `/cali/master_ctrl.db` |
 
 **Then reboot the camera** - it will automatically connect to your platform!
 
