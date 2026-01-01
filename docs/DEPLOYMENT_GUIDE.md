@@ -701,6 +701,104 @@ reboot
 
 ---
 
+## Part 3.5: Adding Second and Subsequent Cameras (Easy Method)
+
+**Good news!** After setting up your first camera, adding more cameras is much simpler. All cameras can share the same certificate files.
+
+### Why This Works
+
+The platform uses a **shared certificate model**:
+- All cameras use the same MQTT client certificates
+- The CA certificate is identical across all cameras
+- Each camera is identified by its unique Camera ID (not by certificate)
+- The `master_ctrl.db` is only needed if you want to override server configuration
+
+### Quick Steps for Camera 2, 3, 4, etc.
+
+**Option A: Copy from First Camera (Recommended)**
+
+If you have access to your first working camera, simply copy the certificate files to the new camera:
+
+```bash
+# Step 1: Connect to FIRST camera via FTP
+ftp FIRST_CAMERA_IP
+# Login: root / password
+
+# Step 2: Download certificate files to your computer
+ftp> cd /root/certs
+ftp> get mqttCA.crt
+ftp> get mqtt.pem
+ftp> get mqtt.key
+ftp> cd /etc/ssl/certs
+ftp> get ca-bundle.trust.crt
+ftp> quit
+
+# Step 3: Connect to NEW camera via FTP
+ftp NEW_CAMERA_IP
+# Login: root / password
+
+# Step 4: Upload certificate files
+ftp> cd /root/certs
+ftp> put mqttCA.crt
+ftp> put mqtt.pem
+ftp> put mqtt.key
+ftp> cd /etc/ssl/certs
+ftp> put ca-bundle.trust.crt
+ftp> quit
+```
+
+**File Transfer Reference Table:**
+
+| File | Purpose | Source Location | Destination Location | Size |
+|------|---------|----------------|---------------------|------|
+| `mqttCA.crt` | MQTT broker CA certificate | `/root/certs/mqttCA.crt` | `/root/certs/mqttCA.crt` | ~1.2 KB |
+| `mqtt.pem` | MQTT client certificate + key | `/root/certs/mqtt.pem` | `/root/certs/mqtt.pem` | ~3-4 KB |
+| `mqtt.key` | MQTT client private key | `/root/certs/mqtt.key` | `/root/certs/mqtt.key` | ~1.7 KB |
+| `ca-bundle.trust.crt` | System CA bundle (for HTTPS config server) | `/etc/ssl/certs/ca-bundle.trust.crt` | `/etc/ssl/certs/ca-bundle.trust.crt` | ~200 KB |
+
+**Step 5: Reboot the new camera**
+
+```bash
+# On new camera (via telnet/SSH)
+reboot
+```
+
+**That's it!** The camera will automatically:
+1. Connect to config server using `ca-bundle.trust.crt`
+2. Get server configuration
+3. Connect to EMQX using the shared certificates
+4. Appear in your dashboard within 1-2 minutes
+
+---
+
+**Option B: Generate Fresh Certificates (If Needed)**
+
+If you don't have access to the first camera, generate fresh certificates:
+
+```bash
+python3 tools/add_camera.py NEW_CAMERA_ID
+# Then follow FTP steps from Part 3.2-3.3
+```
+
+**Note:** Both methods work identically - the certificates are the same!
+
+---
+
+### Verification
+
+After rebooting the new camera, verify it's connected:
+
+```bash
+# Check EMQX clients
+emqx ctl clients list | grep NEW_CAMERA_ID
+
+# Check dashboard
+https://YOUR_DOMAIN:5000
+# New camera should appear in the list
+```
+
+---
+
 ## Part 4: Verification
 
 ### Check 1: Config Server Logs
@@ -788,10 +886,15 @@ Your camera platform is now fully operational!
 
 ### Add More Cameras
 
+**Easy method (recommended):** Copy certificate files from your first camera to new cameras. See [Part 3.5: Adding Subsequent Cameras](#part-35-adding-second-and-subsequent-cameras-easy-method) for step-by-step instructions.
+
+**Alternative method:** Generate fresh certificates:
 ```bash
 python3 tools/add_camera.py ANOTHER_CAMERA_ID
-# Repeat FTP and configuration steps
+# Then FTP certificates to camera and reboot
 ```
+
+Both methods work identically since all cameras share the same certificates!
 
 ### Secure Your Installation
 

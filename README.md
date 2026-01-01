@@ -71,11 +71,27 @@ python3 tools/add_camera.py <CAMERA_ID>
 
 → **Go to: [Camera Setup Guide](docs/CAMERA_SETUP.md)**
 
-Quick steps:
+#### **First Camera:**
 ```bash
 python3 tools/add_camera.py <CAMERA_ID>
 # Follow prompts to FTP certificates to camera
 ```
+
+#### **Second and Subsequent Cameras (Easy Method):**
+If you've already set up one camera, you can **reuse the same certificate files** for all additional cameras! No need to run `add_camera.py` again.
+
+**Simply FTP these files from your first camera to any new camera:**
+
+| File | Source (First Camera) | Destination (New Camera) |
+|------|----------------------|--------------------------|
+| `mqttCA.crt` | `/root/certs/mqttCA.crt` | `/root/certs/mqttCA.crt` |
+| `mqtt.pem` | `/root/certs/mqtt.pem` | `/root/certs/mqtt.pem` |
+| `mqtt.key` | `/root/certs/mqtt.key` | `/root/certs/mqtt.key` |
+| `ca-bundle.trust.crt` | `/etc/ssl/certs/ca-bundle.trust.crt` | `/etc/ssl/certs/ca-bundle.trust.crt` |
+
+**Then reboot the camera** - it will automatically connect to your platform!
+
+See [Deployment Guide - Adding Subsequent Cameras](docs/DEPLOYMENT_GUIDE.md#adding-second-and-subsequent-cameras-easy-method) for detailed steps.
 
 ---
 
