@@ -191,6 +191,20 @@ class CameraController:
 
         return self._publish_message(topic, message)
 
+    def send_sound_message(self, sound_type):
+        """Send sound playback command"""
+        topic = f"prod/honeycomb/{self.camera_id}/sound/play"
+
+        message = {
+            "requestId": self.generate_request_id(),
+            "creationTimestamp": datetime.utcnow().isoformat() + "Z",
+            "sourceId": self.camera_id,
+            "sourceType": "hive-cam",
+            "sound": sound_type
+        }
+
+        return self._publish_message(topic, message)
+
     def _publish_message(self, topic, message):
         """Publish message to EMQX broker"""
         global mqtt_connected
@@ -793,6 +807,34 @@ def api_control_mode(camera_id, mode):
             )
         except Exception as e:
             logger.error(f"Failed to update camera status in database: {e}")
+
+    if result["success"]:
+        return jsonify(result)
+    else:
+        return jsonify(result), 500
+
+@app.route('/api/control/sound/<camera_id>', methods=['POST'])
+@require_auth
+def api_control_sound(camera_id):
+    """Send sound play command to camera"""
+    data = request.get_json()
+    if not data or 'sound' not in data:
+        return jsonify({
+            "success": False,
+            "error": "Missing sound type"
+        }), 400
+
+    sound_type = data['sound']
+    valid_sounds = ['POLICE_SIREN', 'DOG_BARK', 'LULLABY', 'HOUSE_ALARM']
+
+    if sound_type not in valid_sounds:
+        return jsonify({
+            "success": False,
+            "error": f"Invalid sound: {sound_type}. Must be one of {', '.join(valid_sounds)}"
+        }), 400
+
+    controller = CameraController(camera_id=camera_id)
+    result = controller.send_sound_message(sound_type)
 
     if result["success"]:
         return jsonify(result)
