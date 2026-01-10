@@ -83,9 +83,8 @@
                             title="Arm Camera">
                             Arm
                         </button>
-                        <button class="btn btn-danger" onclick="openSoundModal('{{ camera.id }}')"
-                            title="Play Siren/Sound">
-                            <i class="fas fa-bullhorn me-1"></i>Siren
+                        <button class="btn btn-warning" onclick="openSoundModal('{{ camera.id }}')" title="Play Sound">
+                            <i class="fas fa-bullhorn me-1"></i>Play Sound
                         </button>
                         <button class="btn btn-outline-secondary"
                             onclick="sendCameraCommand('{{ camera.id }}', 'PRIVACY')" title="Privacy Mode">
