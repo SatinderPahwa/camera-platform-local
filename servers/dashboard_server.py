@@ -200,7 +200,7 @@ class CameraController:
             "creationTimestamp": datetime.utcnow().isoformat() + "Z",
             "sourceId": self.camera_id,
             "sourceType": "hive-cam",
-            "sound": sound_type
+            "soundType": sound_type
         }
 
         return self._publish_message(topic, message)
