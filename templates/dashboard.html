@@ -219,21 +219,47 @@
                     <input type="hidden" id="soundCameraId">
                     <div class="mb-3">
                         <label for="soundType" class="form-label">Select Sound</label>
-                        <select class="form-select" id="soundType">
+                        <select class="form-select" id="soundType" onchange="updateNativeDurationLabel()">
                             <option value="POLICE_SIREN" selected>Police Siren (20s)</option>
                             <option value="DOG_BARK">Dog Bark (20s)</option>
                             <option value="LULLABY">Lullaby (30s)</option>
                             <option value="HOUSE_ALARM">House Alarm (20s)</option>
                         </select>
-                        <div class="form-text">
-                            The sound will play for the duration specified.
+                    </div>
+
+                    <!-- Play Mode Selection -->
+                    <div class="btn-group w-100 mb-3" role="group">
+                        <input type="radio" class="btn-check" name="playMode" id="modeOnce" value="once" checked
+                            onchange="toggleDurationInput()">
+                        <label class="btn btn-outline-secondary" for="modeOnce">Play Once</label>
+
+                        <input type="radio" class="btn-check" name="playMode" id="modeLoop" value="loop"
+                            onchange="toggleDurationInput()">
+                        <label class="btn btn-outline-primary" for="modeLoop">Custom Loop</label>
+                    </div>
+
+                    <!-- Duration Input (Hidden by default) -->
+                    <div id="durationInputGroup" class="mb-3 d-none">
+                        <label for="soundDuration" class="form-label">Duration (seconds)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="soundDuration" value="50" min="10" max="300">
+                            <span class="input-group-text">sec</span>
+                        </div>
+                    </div>
+
+                    <!-- Stop Button (Visible in body for quick access) -->
+                    <div class="d-grid mt-4">
+                        <button type="button" class="btn btn-outline-danger" onclick="stopSoundCommand()">
+                            <i class="fas fa-stop-circle me-1"></i>Stop Sound Immediately
+                        </button>
+                        <div class="form-text text-center text-muted mt-1">Stops any active sound or loop on the camera.
                         </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" onclick="sendSoundCommand()">
+                <button type="button" class="btn btn-warning" onclick="sendSoundCommand()">
                     <i class="fas fa-play me-1"></i>Play Sound
                 </button>
             </div>
@@ -434,8 +460,13 @@
 
     function openSoundModal(cameraId) {
         document.getElementById('soundCameraId').value = cameraId;
-        // Reset to default
+        // Reset controls
         document.getElementById('soundType').value = 'POLICE_SIREN';
+        document.getElementById('modeOnce').checked = true;
+
+        // Use Javascript trigger to update UI state
+        toggleDurationInput();
+        updateNativeDurationLabel();
 
         if (!soundModal) {
             soundModal = new bootstrap.Modal(document.getElementById('soundModal'));
@@ -443,10 +474,46 @@
         soundModal.show();
     }
 
+    function toggleDurationInput() {
+        const isLoop = document.getElementById('modeLoop').checked;
+        const durationGroup = document.getElementById('durationInputGroup');
+        const loopLabel = document.querySelector('label[for="modeLoop"]');
+
+        if (isLoop) {
+            durationGroup.classList.remove('d-none');
+            // Visual feedback
+            loopLabel.classList.remove('btn-outline-secondary');
+            loopLabel.classList.add('btn-outline-primary');
+        } else {
+            durationGroup.classList.add('d-none');
+            loopLabel.classList.add('btn-outline-secondary');
+            loopLabel.classList.remove('btn-outline-primary');
+        }
+    }
+
+    function updateNativeDurationLabel() {
+        // Just for user clarity
+    }
+
     function sendSoundCommand() {
         const cameraId = document.getElementById('soundCameraId').value;
         const soundType = document.getElementById('soundType').value;
-        const btn = document.querySelector('#soundModal .btn-danger'); // The Play Sound button
+        const isLoop = document.getElementById('modeLoop').checked;
+
+        let payload = {
+            soundType: soundType
+        };
+
+        if (isLoop) {
+            const duration = document.getElementById('soundDuration').value;
+            if (!duration || duration < 5) {
+                alert("Please enter a valid duration (minimum 5 seconds)");
+                return;
+            }
+            payload.duration = parseInt(duration);
+        }
+
+        const btn = document.querySelector('#soundModal .btn-warning');
 
         // Disable button during request
         const originalText = btn.innerHTML;
@@ -458,14 +525,14 @@
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ sound: soundType })
+            body: JSON.stringify(payload)
         })
             .then(response => response.json())
             .then(result => {
                 if (result.success) {
                     // Close modal
                     soundModal.hide();
-                    alert(`Sound command sent successfully!`);
+                    alert(`Sound command sent successfully!${isLoop ? ' Loop started.' : ''}`);
                 } else {
                     alert(`Failed to send command: ${result.error}`);
                 }
@@ -478,6 +545,32 @@
                 // Re-enable button
                 btn.disabled = false;
                 btn.innerHTML = originalText;
+            });
+    }
+
+    function stopSoundCommand() {
+        const cameraId = document.getElementById('soundCameraId').value;
+        if (!cameraId) return;
+
+        if (!confirm("Are you sure you want to stop the sound immediately?")) return;
+
+        fetch(`/api/control/sound/stop/${cameraId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Sound stopped successfully!');
+                } else {
+                    alert('Error stopping sound: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                alert('Failed to send stop command');
             });
     }
 </script>

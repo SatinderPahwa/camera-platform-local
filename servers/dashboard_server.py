@@ -106,7 +106,126 @@ def init_mqtt_client():
         mqtt_client = None
 
 # Initialize MQTT client in background
+# Initialize MQTT client in background
 init_mqtt_client()
+
+# ============================================================================
+# Sound Playback Manager (Background Threading)
+# ============================================================================
+import time
+
+# Global dictionary to track active sound threads: camera_id -> {'thread': Thread, 'stop_event': Event}
+active_sound_tasks = {}
+sound_tasks_lock = threading.Lock()
+
+class SoundManager:
+    """Manages background threads for timed sound playback loops"""
+    
+    @staticmethod
+    def _sound_loop(camera_id, sound_type, duration, stop_event):
+        """Worker function for the sound thread"""
+        logger.info(f"Starting sound loop for {camera_id}: {sound_type} for {duration}s")
+        
+        # Native durations of sounds (approximate)
+        # We re-trigger 1 second before end to ensure overlap
+        NATIVE_DURATIONS = {
+            'POLICE_SIREN': 20,
+            'DOG_BARK': 20,
+            'HOUSE_ALARM': 20,
+            'LULLABY': 30
+        }
+        
+        # Default to 20s if unknown
+        native_duration = NATIVE_DURATIONS.get(sound_type, 20)
+        overlap_buffer = 1  # Re-trigger 1s before end
+        loop_interval = max(5, native_duration - overlap_buffer) # Ensure at least 5s interval
+        
+        start_time = time.time()
+        
+        # Create controller for this thread
+        controller = CameraController(camera_id=camera_id)
+        
+        while not stop_event.is_set():
+            current_time = time.time()
+            elapsed = current_time - start_time
+            
+            if elapsed >= duration:
+                logger.info(f"Sound duration {duration}s reached for {camera_id}")
+                break
+                
+            # Play sound
+            logger.info(f"Triggering sound {sound_type} for {camera_id} (Elapsed: {elapsed:.1f}s)")
+            controller.send_sound_message(sound_type)
+            
+            # Calculate time to sleep
+            # Sleep for loop_interval OR remaining time, whichever is smaller
+            remaining = duration - elapsed
+            sleep_time = min(loop_interval, remaining)
+            
+            # Wait for sleep_time or stop_event
+            if stop_event.wait(sleep_time):
+                logger.info(f"Sound loop stopped by user for {camera_id}")
+                break
+        
+        # Always send stop command when loop ends (either timeout or user stop)
+        controller.send_stop_sound_message()
+        
+        # Cleanup global registry
+        with sound_tasks_lock:
+            if camera_id in active_sound_tasks:
+                del active_sound_tasks[camera_id]
+
+    @staticmethod
+    def start_sound(camera_id, sound_type, duration=None):
+        """Start playing sound, with optional custom duration loop"""
+        
+        # Stop any existing sound task for this camera
+        SoundManager.stop_sound(camera_id)
+        
+        # If no duration specified, just play it once via controller (fire and forget)
+        # BUT user might want "Stop" button to work even for single play.
+        # So we'll treat "Play Once" as a loop of native_duration length?
+        # Actually, the requirement is "custom duration". If just "Play Once", we can just send it.
+        # But to be safe and consistent, if we want the "Stop" button to work beautifully,
+        # we might just want to send the command directly if it's "Play Once".
+        # However, the user asked for "Stop" button. To support Stop, we need `send_stop_sound_message`.
+        # The loop logic is mainly for durations > native.
+        
+        if duration is None:
+            # simple play once
+            controller = CameraController(camera_id=camera_id)
+            return controller.send_sound_message(sound_type)
+            
+        # For custom duration, start thread
+        with sound_tasks_lock:
+            stop_event = threading.Event()
+            thread = threading.Thread(
+                target=SoundManager._sound_loop,
+                args=(camera_id, sound_type, float(duration), stop_event),
+                daemon=True
+            )
+            active_sound_tasks[camera_id] = {
+                'thread': thread,
+                'stop_event': stop_event
+            }
+            thread.start()
+            
+        return {"success": True, "message": f"Started background sound loop for {duration}s"}
+
+    @staticmethod
+    def stop_sound(camera_id):
+        """Stop any active sound loop and send stop command to camera"""
+        # 1. Cancel background thread if any
+        with sound_tasks_lock:
+            task = active_sound_tasks.get(camera_id)
+            if task:
+                task['stop_event'].set()
+                # We don't join() here to avoid blocking the HTTP request
+                # The thread will exit soon and clean itself up
+        
+        # 2. Send immediate stop command to camera
+        controller = CameraController(camera_id=camera_id)
+        return controller.send_stop_sound_message()
 
 class CameraController:
     """Controller for sending commands to cameras via EMQX MQTT"""
@@ -201,6 +320,19 @@ class CameraController:
             "sourceId": self.camera_id,
             "sourceType": "hive-cam",
             "soundType": sound_type
+        }
+
+        return self._publish_message(topic, message)
+
+    def send_stop_sound_message(self):
+        """Send sound stop command"""
+        topic = f"prod/honeycomb/{self.camera_id}/sound/stop"
+
+        message = {
+            "requestId": self.generate_request_id(),
+            "creationTimestamp": datetime.utcnow().isoformat() + "Z",
+            "sourceId": self.camera_id,
+            "sourceType": "hive-cam"
         }
 
         return self._publish_message(topic, message)
@@ -816,30 +948,54 @@ def api_control_mode(camera_id, mode):
 @app.route('/api/control/sound/<camera_id>', methods=['POST'])
 @require_auth
 def api_control_sound(camera_id):
-    """Send sound play command to camera"""
+    """Send sound playback command to camera"""
     data = request.get_json()
-    if not data or 'sound' not in data:
-        return jsonify({
-            "success": False,
-            "error": "Missing sound type"
-        }), 400
+    if not data:
+        return jsonify({"success": False, "error": "No JSON payload provided"}), 400
 
-    sound_type = data['sound']
+    # Accept either 'sound' or 'soundType' for backward/forward compatibility
+    sound_type = data.get('soundType') or data.get('sound')
+    duration = data.get('duration') # Optional, in seconds
+
+    if not sound_type:
+        return jsonify({"success": False, "error": "Missing sound type"}), 400
+
+    # Validate sound type
     valid_sounds = ['POLICE_SIREN', 'DOG_BARK', 'LULLABY', 'HOUSE_ALARM']
-
     if sound_type not in valid_sounds:
         return jsonify({
             "success": False,
-            "error": f"Invalid sound: {sound_type}. Must be one of {', '.join(valid_sounds)}"
+            "error": f"Invalid sound: {sound_type}. Must be one of: {', '.join(valid_sounds)}"
         }), 400
 
-    controller = CameraController(camera_id=camera_id)
-    result = controller.send_sound_message(sound_type)
+    # Use SoundManager to handle playback logic
+    try:
+        if duration:
+            # Start loop
+            SoundManager.start_sound(camera_id, sound_type, duration)
+        else:
+            # Single play
+            SoundManager.start_sound(camera_id, sound_type, None)
+            
+        return jsonify({
+            "success": True, 
+            "message": "Sound command sent",
+            "active_duration": duration
+        })
+    except Exception as e:
+        logger.error(f"Error controlling sound: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
-    if result["success"]:
+@app.route('/api/control/sound/stop/<camera_id>', methods=['POST'])
+@require_auth
+def api_control_sound_stop(camera_id):
+    """Stop sound playback immediately"""
+    try:
+        result = SoundManager.stop_sound(camera_id)
         return jsonify(result)
-    else:
-        return jsonify(result), 500
+    except Exception as e:
+        logger.error(f"Error stopping sound: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/control/reboot/<camera_id>', methods=['POST'])
 @require_auth
