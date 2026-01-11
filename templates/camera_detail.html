@@ -21,7 +21,8 @@
                 <div class="row small">
                     <div class="col-md-3">
                         <strong>Status:</strong>
-                        <span class="badge bg-{% if camera.status == 'active' %}success{% elif camera.status == 'online' %}info{% elif camera.status == 'unknown' %}secondary{% else %}danger{% endif %}">
+                        <span
+                            class="badge bg-{% if camera.status == 'active' %}success{% elif camera.status == 'online' %}info{% elif camera.status == 'unknown' %}secondary{% else %}danger{% endif %}">
                             {{ camera.status|title }}
                         </span>
                     </div>
@@ -56,7 +57,8 @@
                     <div class="col-md-12">
                         <h6 class="mb-2"><i class="fas fa-tag me-2"></i>Camera Name</h6>
                         <div class="input-group mb-2">
-                            <input type="text" class="form-control" id="cameraName" value="{{ camera.name }}" placeholder="Enter camera name">
+                            <input type="text" class="form-control" id="cameraName" value="{{ camera.name }}"
+                                placeholder="Enter camera name">
                             <button class="btn btn-primary" onclick="renameCamera()">
                                 <i class="fas fa-save"></i> Save Name
                             </button>
@@ -197,6 +199,18 @@
                             </div>
                         </div>
                     </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="volume" class="form-label">Speaker Volume</label>
+                                <select class="form-select" id="volume" name="volume">
+                                    <option value="HIGH">High</option>
+                                    <option value="MEDIUM">Medium</option>
+                                    <option value="LOW">Low</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                     <div class="d-flex justify-content-between">
                         <button type="button" class="btn btn-primary" onclick="applySettings()">
                             <i class="fas fa-save"></i> Apply Settings
@@ -242,7 +256,8 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <span class="badge bg-{% if event.activity_type == 'MOTION' %}danger{% else %}info{% endif %}">
+                                    <span
+                                        class="badge bg-{% if event.activity_type == 'MOTION' %}danger{% else %}info{% endif %}">
                                         {{ event.activity_type }}
                                     </span>
                                 </td>
@@ -255,7 +270,8 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <span class="badge bg-{% if event.upload_status == 'completed' %}success{% elif event.upload_status == 'pending' %}warning{% else %}secondary{% endif %}">
+                                    <span
+                                        class="badge bg-{% if event.upload_status == 'completed' %}success{% elif event.upload_status == 'pending' %}warning{% else %}secondary{% endif %}">
                                         {{ event.upload_status|title }}
                                     </span>
                                 </td>
@@ -292,23 +308,23 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({})
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Camera mode set to ' + mode);
-                location.reload(); // Refresh to show updated status
-            } else {
-                alert('Failed to set camera mode: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            alert('Failed to set camera mode: ' + error.message);
-            console.error('Camera control error:', error);
-        })
-        .finally(() => {
-            // Re-enable buttons
-            buttons.forEach(btn => btn.disabled = false);
-        });
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Camera mode set to ' + mode);
+                    location.reload(); // Refresh to show updated status
+                } else {
+                    alert('Failed to set camera mode: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                alert('Failed to set camera mode: ' + error.message);
+                console.error('Camera control error:', error);
+            })
+            .finally(() => {
+                // Re-enable buttons
+                buttons.forEach(btn => btn.disabled = false);
+            });
     }
 
     function rebootCamera() {
@@ -327,25 +343,25 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({})
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Reboot command sent to camera. Camera will restart in a few seconds.');
-            } else {
-                alert('Failed to reboot camera: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            alert('Failed to reboot camera: ' + error.message);
-            console.error('Reboot error:', error);
-        })
-        .finally(() => {
-            // Re-enable button after delay
-            setTimeout(() => {
-                rebootBtn.disabled = false;
-                rebootBtn.innerHTML = '<i class="fas fa-power-off"></i> REBOOT';
-            }, 5000);
-        });
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Reboot command sent to camera. Camera will restart in a few seconds.');
+                } else {
+                    alert('Failed to reboot camera: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                alert('Failed to reboot camera: ' + error.message);
+                console.error('Reboot error:', error);
+            })
+            .finally(() => {
+                // Re-enable button after delay
+                setTimeout(() => {
+                    rebootBtn.disabled = false;
+                    rebootBtn.innerHTML = '<i class="fas fa-power-off"></i> REBOOT';
+                }, 5000);
+            });
     }
 
     function renameCamera() {
@@ -367,24 +383,24 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: newName })
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Camera renamed successfully!');
-                // Reload page to update camera name in header
-                location.reload();
-            } else {
-                alert('Failed to rename camera: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            alert('Failed to rename camera: ' + error.message);
-            console.error('Rename error:', error);
-        })
-        .finally(() => {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-save"></i> Save Name';
-        });
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Camera renamed successfully!');
+                    // Reload page to update camera name in header
+                    location.reload();
+                } else {
+                    alert('Failed to rename camera: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                alert('Failed to rename camera: ' + error.message);
+                console.error('Rename error:', error);
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save"></i> Save Name';
+            });
     }
 
     function applySettings() {
@@ -407,22 +423,22 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settings)
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Camera settings applied successfully!');
-            } else {
-                alert('Failed to apply settings: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            alert('Failed to apply settings: ' + error.message);
-            console.error('Settings error:', error);
-        })
-        .finally(() => {
-            applyBtn.disabled = false;
-            applyBtn.innerHTML = '<i class="fas fa-save"></i> Apply Settings';
-        });
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Camera settings applied successfully!');
+                } else {
+                    alert('Failed to apply settings: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                alert('Failed to apply settings: ' + error.message);
+                console.error('Settings error:', error);
+            })
+            .finally(() => {
+                applyBtn.disabled = false;
+                applyBtn.innerHTML = '<i class="fas fa-save"></i> Apply Settings';
+            });
     }
 
     function loadSavedSettings() {
@@ -459,6 +475,9 @@
                     if (settings.soundAlert !== undefined) {
                         document.getElementById('soundAlert').value = String(settings.soundAlert);
                     }
+                    if (settings.volume) {
+                        document.getElementById('volume').value = settings.volume;
+                    }
 
                     console.log('✅ Loaded', data.settings_count, 'saved settings from database:', settings);
 
@@ -486,12 +505,13 @@
         document.getElementById('ledDot').value = 'true';
         document.getElementById('ledRing').value = 'true';
         document.getElementById('soundAlert').value = 'true';
+        document.getElementById('volume').value = 'MEDIUM';
 
         alert('Settings reset to defaults. Click "Apply Settings" to save.');
     }
 
     // Load saved settings when page loads
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         loadSavedSettings();
     });
 </script>
