@@ -132,6 +132,7 @@ $ACTUAL_USER ALL=(ALL) NOPASSWD: /usr/bin/emqx
 $ACTUAL_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart emqx
 $ACTUAL_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart coturn
 $ACTUAL_USER ALL=(ALL) NOPASSWD: /usr/bin/docker restart kms-production
+$ACTUAL_USER ALL=(ALL) NOPASSWD: /bin/sh -c DATABASE_PATH=* setsid */venv/bin/python3 enhanced_config_server.py *
 EOF
 
     # Set correct permissions (sudoers files must be 0440)
