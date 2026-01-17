@@ -530,9 +530,8 @@
             .then(response => response.json())
             .then(result => {
                 if (result.success) {
-                    // Close modal
-                    soundModal.hide();
-                    alert(`Sound command sent successfully!${isLoop ? ' Loop started.' : ''}`);
+                    // Keep modal open so user can stop sound or play another
+                    alert(`Sound command sent successfully!${isLoop ? ' Loop started.' : ''}\n\nModal stays open - use "Stop Sound" button or close manually.`);
                 } else {
                     alert(`Failed to send command: ${result.error}`);
                 }
