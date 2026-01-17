@@ -14,6 +14,7 @@ import os
 import sys
 import sqlite3
 import argparse
+import shutil
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -127,24 +128,28 @@ def cleanup_recordings(days_to_keep, dry_run=False, skip_confirmation=False):
         # Step 2: Calculate total space to be freed
         print("💾 Calculating space to be freed...")
         total_db_size = 0
-        files_to_delete = []
+        dirs_to_delete = []  # Event directories to delete entirely
+        files_to_delete = []  # Individual files (legacy format)
+
+        def get_dir_size(path):
+            """Calculate total size of directory"""
+            total = 0
+            for item in path.rglob('*'):
+                if item.is_file():
+                    total += item.stat().st_size
+            return total
 
         for event in old_events:
             # Check recording path (can be file or directory)
             if event['recording_path']:
                 path = Path(event['recording_path'])
                 if path.exists():
-                    # If it's a directory, scan all files inside
+                    # If it's a directory, calculate size and mark entire directory for deletion
                     if path.is_dir():
-                        for file_path in path.rglob('*'):
-                            if file_path.is_file():
-                                # Skip system files
-                                if file_path.name.startswith('.') or file_path.name in ['aes.key']:
-                                    continue
-                                size = file_path.stat().st_size
-                                total_db_size += size
-                                files_to_delete.append((file_path, size))
-                    # If it's a file, add it directly
+                        size = get_dir_size(path)
+                        total_db_size += size
+                        dirs_to_delete.append((path, size))
+                    # If it's a file, add it directly (legacy format)
                     elif path.is_file():
                         size = path.stat().st_size
                         total_db_size += size
@@ -153,50 +158,45 @@ def cleanup_recordings(days_to_keep, dry_run=False, skip_confirmation=False):
                     stats['orphaned_db_entries'] += 1
 
             # Check thumbnail path (can be file or directory)
+            # Note: thumbnail_path is usually inside recording_path directory,
+            # so it will be deleted when we delete recording_path directory
+            # Only handle it separately if it's standalone
             if event['thumbnail_path']:
                 path = Path(event['thumbnail_path'])
-                if path.exists():
-                    # If it's a directory, scan all files inside
+                # Check if thumbnail_path is already covered by recording_path
+                recording_path = Path(event['recording_path']) if event['recording_path'] else None
+                is_inside_recording = (recording_path and
+                                      recording_path.is_dir() and
+                                      path.resolve().is_relative_to(recording_path.resolve()))
+
+                if not is_inside_recording and path.exists():
+                    # Standalone thumbnail - handle separately
                     if path.is_dir():
-                        for file_path in path.rglob('*'):
-                            if file_path.is_file():
-                                # Skip system files
-                                if file_path.name.startswith('.'):
-                                    continue
-                                size = file_path.stat().st_size
-                                total_db_size += size
-                                files_to_delete.append((file_path, size))
-                    # If it's a file, add it directly
+                        size = get_dir_size(path)
+                        total_db_size += size
+                        dirs_to_delete.append((path, size))
                     elif path.is_file():
                         size = path.stat().st_size
                         total_db_size += size
                         files_to_delete.append((path, size))
 
-        print(f"   Files to delete: {len(files_to_delete)}")
+        print(f"   Event directories to delete: {len(dirs_to_delete)}")
+        print(f"   Individual files to delete: {len(files_to_delete)}")
         print(f"   Space to free: {format_size(total_db_size)}")
         print(f"   Orphaned DB entries (file missing): {stats['orphaned_db_entries']}")
         print()
 
-        # Step 3: Find orphaned files (files not in database)
-        print("🔍 Scanning for orphaned files (not in database)...")
-        db_files = set()
-        db_dirs = set()
-        cursor.execute("SELECT recording_path, thumbnail_path FROM activity_events")
-        for row in cursor.fetchall():
-            if row[0]:
-                path = Path(row[0]).resolve()
-                # If it's a directory in DB, track it so we don't mark its contents as orphaned
-                if path.is_dir():
-                    db_dirs.add(str(path))
-                else:
-                    db_files.add(str(path))
-            if row[1]:
-                path = Path(row[1]).resolve()
-                if path.is_dir():
-                    db_dirs.add(str(path))
-                else:
-                    db_files.add(str(path))
+        # Step 3: Find orphaned event directories (not in database)
+        print("🔍 Scanning for orphaned event directories (not in database)...")
 
+        # Get all event_ids that exist in database (including future events)
+        cursor.execute("SELECT event_id, recording_path FROM activity_events")
+        db_event_ids = set()
+        for row in cursor.fetchall():
+            if row[0]:  # event_id
+                db_event_ids.add(row[0])
+
+        orphaned_dirs = []
         orphaned_files = []
         orphaned_size = 0
 
@@ -209,56 +209,49 @@ def cleanup_recordings(days_to_keep, dry_run=False, skip_confirmation=False):
                     if not category_dir.is_dir():
                         continue
 
-                    # Files can be directly in category_dir OR in event_id subdirectories
+                    # Scan for event_id subdirectories
                     for item in category_dir.iterdir():
                         # Skip system files
                         if item.name.startswith('.') or item.name in ['upload_log.txt', 'Thumbs.db']:
                             continue
 
-                        files_to_check = []
-
-                        # If it's a directory (event_id), scan files inside it
+                        # If it's a directory (event_id directory)
                         if item.is_dir():
-                            for file_path in item.iterdir():
-                                if file_path.is_file():
-                                    files_to_check.append(file_path)
-                        # If it's a file directly in category_dir
-                        elif item.is_file():
-                            files_to_check.append(item)
+                            event_id = item.name  # Directory name is the event_id
 
-                        # Check all collected files
-                        for file_path in files_to_check:
-                            # Skip system files
-                            if file_path.name.startswith('.') or file_path.name in ['upload_log.txt', 'aes.key']:
-                                continue
+                            # Check if directory is older than cutoff using mtime
+                            dir_mtime = item.stat().st_mtime
+                            if dir_mtime >= cutoff_timestamp:
+                                continue  # Directory is recent, skip
 
-                            # Check if file is older than cutoff
-                            file_mtime = file_path.stat().st_mtime
-                            if file_mtime >= cutoff_timestamp:
-                                continue
-
-                            # Check if file is in database or under a DB directory
-                            file_path_str = str(file_path.resolve())
-                            is_in_db = file_path_str in db_files
-
-                            # Check if file is under any directory tracked in DB
-                            if not is_in_db:
-                                for db_dir in db_dirs:
-                                    if file_path_str.startswith(db_dir + '/') or file_path_str.startswith(db_dir + '\\'):
-                                        is_in_db = True
-                                        break
-
-                            if not is_in_db:
-                                size = file_path.stat().st_size
-                                orphaned_files.append((file_path, size))
+                            # Check if this event_id exists in database
+                            if event_id not in db_event_ids:
+                                # Orphaned event directory - not in database and old
+                                size = get_dir_size(item)
+                                orphaned_dirs.append((item, size))
                                 orphaned_size += size
                                 stats['orphaned_files'] += 1
 
-        print(f"   Orphaned files found: {len(orphaned_files)}")
-        print(f"   Orphaned files size: {format_size(orphaned_size)}")
+                        # If it's a file directly in category_dir (legacy format)
+                        elif item.is_file():
+                            # Check if file is older than cutoff
+                            file_mtime = item.stat().st_mtime
+                            if file_mtime >= cutoff_timestamp:
+                                continue
+
+                            # Standalone orphaned file
+                            size = item.stat().st_size
+                            orphaned_files.append((item, size))
+                            orphaned_size += size
+                            stats['orphaned_files'] += 1
+
+        print(f"   Orphaned event directories: {len(orphaned_dirs)}")
+        print(f"   Orphaned individual files: {len(orphaned_files)}")
+        print(f"   Orphaned content size: {format_size(orphaned_size)}")
         print()
 
         # Step 4: Summary
+        total_dirs = len(dirs_to_delete) + len(orphaned_dirs)
         total_files = len(files_to_delete) + len(orphaned_files)
         total_size = total_db_size + orphaned_size
 
@@ -266,7 +259,10 @@ def cleanup_recordings(days_to_keep, dry_run=False, skip_confirmation=False):
         print("📊 SUMMARY")
         print("=" * 60)
         print(f"Events to delete from DB: {stats['events_to_delete']}")
-        print(f"Files to delete: {total_files}")
+        print(f"Directories to delete: {total_dirs}")
+        print(f"  - With DB records: {len(dirs_to_delete)}")
+        print(f"  - Orphaned (no DB): {len(orphaned_dirs)}")
+        print(f"Individual files to delete: {total_files}")
         print(f"  - With DB records: {len(files_to_delete)}")
         print(f"  - Orphaned (no DB): {len(orphaned_files)}")
         print(f"Total space to free: {format_size(total_size)}")
@@ -287,10 +283,31 @@ def cleanup_recordings(days_to_keep, dry_run=False, skip_confirmation=False):
                 return
             print()
 
-        # Step 6: Delete files
-        print("🗑️  Deleting files...")
+        # Step 6: Delete files and directories
+        print("🗑️  Deleting event directories and files...")
 
-        # Delete files with DB records
+        # Delete event directories with DB records
+        dirs_deleted = 0
+        for dir_path, size in dirs_to_delete:
+            try:
+                shutil.rmtree(dir_path)
+                dirs_deleted += 1
+                stats['space_freed'] += size
+            except Exception as e:
+                print(f"   ⚠️  Failed to delete directory {dir_path}: {e}")
+                stats['errors'] += 1
+
+        # Delete orphaned event directories
+        for dir_path, size in orphaned_dirs:
+            try:
+                shutil.rmtree(dir_path)
+                dirs_deleted += 1
+                stats['space_freed'] += size
+            except Exception as e:
+                print(f"   ⚠️  Failed to delete orphaned directory {dir_path}: {e}")
+                stats['errors'] += 1
+
+        # Delete individual files with DB records (legacy format)
         for file_path, size in files_to_delete:
             try:
                 file_path.unlink()
@@ -300,7 +317,7 @@ def cleanup_recordings(days_to_keep, dry_run=False, skip_confirmation=False):
                 print(f"   ⚠️  Failed to delete {file_path}: {e}")
                 stats['errors'] += 1
 
-        # Delete orphaned files
+        # Delete orphaned individual files (legacy format)
         for file_path, size in orphaned_files:
             try:
                 file_path.unlink()
@@ -310,7 +327,8 @@ def cleanup_recordings(days_to_keep, dry_run=False, skip_confirmation=False):
                 print(f"   ⚠️  Failed to delete {file_path}: {e}")
                 stats['errors'] += 1
 
-        print(f"   Deleted {stats['files_deleted']} files")
+        print(f"   Deleted {dirs_deleted} directories")
+        print(f"   Deleted {stats['files_deleted']} individual files")
         print()
 
         # Step 7: Delete database records
@@ -335,7 +353,8 @@ def cleanup_recordings(days_to_keep, dry_run=False, skip_confirmation=False):
         print("✅ CLEANUP COMPLETE")
         print("=" * 60)
         print(f"Events processed: {stats['events_deleted']}")
-        print(f"Files deleted: {stats['files_deleted']}")
+        print(f"Directories deleted: {dirs_deleted}")
+        print(f"Individual files deleted: {stats['files_deleted']}")
         print(f"Orphaned DB entries: {stats['orphaned_db_entries']}")
         print(f"Space freed: {format_size(stats['space_freed'])}")
         if stats['errors'] > 0:

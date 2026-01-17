@@ -1515,8 +1515,8 @@ def api_admin_storage_stats():
                             if file_path.name.startswith('.') or file_path.name in ['upload_log.txt', 'Thumbs.db', 'aes.key']:
                                 continue
 
-                            # Only count actual recording files (activity ZIPs and thumbnails)
-                            recording_extensions = {'.zip', '.jpg', '.jpeg', '.png'}
+                            # Only count actual recording files (activity ZIPs, thumbnails, and video segments)
+                            recording_extensions = {'.zip', '.jpg', '.jpeg', '.png', '.ts'}
                             if file_path.suffix.lower() not in recording_extensions:
                                 continue
 
