@@ -16,6 +16,7 @@ import io
 import tempfile
 import subprocess
 import threading
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -341,11 +342,23 @@ class CameraController:
         """Publish message to EMQX broker"""
         global mqtt_connected
 
+        # Wait up to 5 seconds for MQTT connection if not yet established
         if not self.client or not mqtt_connected:
-            return {
-                "success": False,
-                "error": "MQTT client not connected to EMQX broker"
-            }
+            timeout = 5.0  # seconds
+            start_time = time.time()
+
+            while (time.time() - start_time) < timeout:
+                if self.client and mqtt_connected:
+                    logger.info(f"MQTT connection established after {time.time() - start_time:.2f}s wait")
+                    break
+                time.sleep(0.1)  # Check every 100ms
+
+            # If still not connected after timeout, return error
+            if not self.client or not mqtt_connected:
+                return {
+                    "success": False,
+                    "error": "MQTT client not connected to EMQX broker (timeout after 5s)"
+                }
 
         try:
             payload = json.dumps(message)
