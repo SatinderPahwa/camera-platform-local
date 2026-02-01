@@ -108,22 +108,18 @@ def cleanup_recordings(days_to_keep, dry_run=False, skip_confirmation=False):
         print(f"   Found {len(old_events)} old events")
         print()
 
-        if len(old_events) == 0:
-            print("✅ No old recordings to delete")
-            conn.close()
-            return
-
-        # Show sample of what will be deleted
-        print("📋 Sample of events to delete (first 5):")
-        for i, event in enumerate(old_events[:5]):
-            event_date = datetime.fromtimestamp(event['start_timestamp'])
-            print(f"   [{i+1}] {event_date.strftime('%Y-%m-%d')} - "
-                  f"{event['camera_name'] or event['camera_id']} - "
-                  f"{event['activity_type']} - "
-                  f"{event['recording_filename'] or 'no file'}")
-        if len(old_events) > 5:
-            print(f"   ... and {len(old_events) - 5} more")
-        print()
+        # Show sample of what will be deleted (if any)
+        if len(old_events) > 0:
+            print("📋 Sample of events to delete (first 5):")
+            for i, event in enumerate(old_events[:5]):
+                event_date = datetime.fromtimestamp(event['start_timestamp'])
+                print(f"   [{i+1}] {event_date.strftime('%Y-%m-%d')} - "
+                      f"{event['camera_name'] or event['camera_id']} - "
+                      f"{event['activity_type']} - "
+                      f"{event['recording_filename'] or 'no file'}")
+            if len(old_events) > 5:
+                print(f"   ... and {len(old_events) - 5} more")
+            print()
 
         # Step 2: Calculate total space to be freed
         print("💾 Calculating space to be freed...")
@@ -331,16 +327,17 @@ def cleanup_recordings(days_to_keep, dry_run=False, skip_confirmation=False):
         print(f"   Deleted {stats['files_deleted']} individual files")
         print()
 
-        # Step 7: Delete database records
-        print("🗑️  Deleting database records...")
-        cursor.execute("""
-            DELETE FROM activity_events
-            WHERE start_timestamp < ?
-        """, (cutoff_timestamp,))
-        stats['events_deleted'] = cursor.rowcount
-        conn.commit()
-        print(f"   Deleted {stats['events_deleted']} events")
-        print()
+        # Step 7: Delete database records (only if there were events to delete)
+        if len(old_events) > 0:
+            print("🗑️  Deleting database records...")
+            cursor.execute("""
+                DELETE FROM activity_events
+                WHERE start_timestamp < ?
+            """, (cutoff_timestamp,))
+            stats['events_deleted'] = cursor.rowcount
+            conn.commit()
+            print(f"   Deleted {stats['events_deleted']} events")
+            print()
 
         # Step 8: Vacuum database
         print("🔧 Optimizing database...")
