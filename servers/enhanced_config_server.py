@@ -12,6 +12,7 @@ import sys
 import uuid
 import re
 import zipfile
+import pwd
 from http.server import HTTPServer, BaseHTTPRequestHandler, ThreadingHTTPServer
 from socketserver import ThreadingMixIn
 from urllib.parse import urlparse
@@ -37,6 +38,51 @@ db = CameraDatabaseManager(str(DATABASE_PATH))
 
 # Initialize Telegram notifier
 telegram = get_telegram_notifier()
+
+# Get satinder user UID/GID for file ownership
+# Config server runs as root (port 80), but files should be owned by satinder
+try:
+    satinder_pwd = pwd.getpwnam('satinder')
+    SATINDER_UID = satinder_pwd.pw_uid
+    SATINDER_GID = satinder_pwd.pw_gid
+    print(f"✓ Will set uploaded files to satinder:satinder (UID:{SATINDER_UID}, GID:{SATINDER_GID})")
+except KeyError:
+    # Fallback if satinder user doesn't exist
+    SATINDER_UID = None
+    SATINDER_GID = None
+    print("⚠️  Warning: satinder user not found, files will remain as root")
+
+def chown_path(path, uid=None, gid=None):
+    """
+    Change ownership of a file or directory (recursively).
+    Only changes ownership if UID/GID are available (satinder user exists).
+
+    Args:
+        path: Path to file or directory
+        uid: User ID (defaults to SATINDER_UID)
+        gid: Group ID (defaults to SATINDER_GID)
+    """
+    if uid is None:
+        uid = SATINDER_UID
+    if gid is None:
+        gid = SATINDER_GID
+
+    # Skip if satinder user not found
+    if uid is None or gid is None:
+        return
+
+    try:
+        path_obj = Path(path)
+
+        # Change ownership of the path itself
+        os.chown(path, uid, gid)
+
+        # If it's a directory, recursively change ownership of contents
+        if path_obj.is_dir():
+            for item in path_obj.rglob('*'):
+                os.chown(item, uid, gid)
+    except Exception as e:
+        print(f"  ⚠️  Failed to chown {path}: {e}")
 
 def parse_event_id_from_filename(filename):
     """
@@ -287,6 +333,7 @@ class ConfigHandler(BaseHTTPRequestHandler):
             upload_dir = UPLOAD_BASE_DIR / camera_id / category
             os.makedirs(upload_dir, exist_ok=True)
             os.chmod(upload_dir, 0o755)
+            chown_path(upload_dir)  # Set ownership to satinder
 
             # Read file data
             content_length = int(self.headers.get('Content-Length', 0))
@@ -301,11 +348,13 @@ class ConfigHandler(BaseHTTPRequestHandler):
                     event_folder = upload_dir / db_event_id
                     os.makedirs(event_folder, exist_ok=True)
                     os.chmod(event_folder, 0o755)
+                    chown_path(event_folder)  # Set ownership to satinder
 
                     zip_file_path = event_folder / filename
                     with open(zip_file_path, 'wb') as f:
                         f.write(file_data)
                     os.chmod(zip_file_path, 0o644)
+                    chown_path(zip_file_path)  # Set ownership to satinder
 
                     print(f"  ✓ ZIP saved: {zip_file_path} ({len(file_data)} bytes)")
 
@@ -314,6 +363,7 @@ class ConfigHandler(BaseHTTPRequestHandler):
                         try:
                             with zipfile.ZipFile(zip_file_path, 'r') as zf:
                                 zf.extractall(event_folder)
+                            chown_path(event_folder)  # Set ownership of extracted files
                             print(f"  ✓ ZIP extracted to {event_folder}")
                             file_path = str(event_folder)
                         except zipfile.BadZipFile as e:
@@ -329,11 +379,13 @@ class ConfigHandler(BaseHTTPRequestHandler):
                         event_folder = activity_dir / db_event_id
                         os.makedirs(event_folder, exist_ok=True)
                         os.chmod(event_folder, 0o755)
+                        chown_path(event_folder)  # Set ownership to satinder
 
                         file_path = os.path.join(event_folder, "thumbnail.zip")
                         with open(file_path, 'wb') as f:
                             f.write(file_data)
                         os.chmod(file_path, 0o644)
+                        chown_path(file_path)  # Set ownership to satinder
 
                         print(f"  ✓ Thumbnail saved: {file_path}")
                     else:
@@ -342,6 +394,7 @@ class ConfigHandler(BaseHTTPRequestHandler):
                         with open(file_path, 'wb') as f:
                             f.write(file_data)
                         os.chmod(file_path, 0o644)
+                        chown_path(file_path)  # Set ownership to satinder
                         print(f"  ✓ File saved: {file_path}")
 
                 # Update database with file paths
