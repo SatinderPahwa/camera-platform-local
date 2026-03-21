@@ -123,19 +123,24 @@
    sudo /etc/letsencrypt/renewal-hooks/post/fix-permissions.sh
    ```
 
-5. **Restart the platform to pick up new cert:**
+5. **Restart the platform AND CoTURN to pick up new cert:**
    ```bash
    cd ~/camera-platform-local && ./scripts/managed_start.sh restart
+   sudo systemctl restart coturn
    ```
+   Note: CoTURN is a separate systemd service not managed by managed_start.sh.
+   It must be restarted separately or livestreaming will fail with "ICE connecting".
 
-6. **Verify:** Open `https://camera.pahwa.net:5000` - should work without cert warnings.
+6. **Verify:**
+   - Dashboard: `https://camera.pahwa.net:5000` - should work without cert warnings
+   - Livestreaming: test from mobile (external network) to confirm TURN/TLS works
 
-7. **Clean up:** Delete the `_acme-challenge.cameras` TXT record from Google Domains DNS.
+7. **Clean up:** Delete the `_acme-challenge.cameras` TXT record from Squarespace DNS.
 
 ### Important Notes
 - Current cert expires: **June 18, 2026**
 - Renewal window: 30 days before expiry (around May 19, 2026)
-- DNS is on Google Domains (ns-cloud-a*.googledomains.com)
+- DNS is managed via Squarespace (nameservers: ns-cloud-a*.googledomains.com)
 - DO NOT use `--standalone` authenticator - port 80 is blocked by Virgin Media ISP
 - The certbot renewal config at `/etc/letsencrypt/renewal/cameras.pahwa.net.conf` may say `authenticator = manual` - this is correct
 
