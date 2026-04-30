@@ -23,17 +23,29 @@ if [ -f "$SCRIPT_DIR/logs/services.env" ]; then
     source "$SCRIPT_DIR/logs/services.env"
 fi
 
+# Helper: kill a process, using sudo if needed (process may run as root)
+kill_process() {
+    local PID=$1
+    local SIGNAL=${2:-TERM}
+    if kill -$SIGNAL $PID 2>/dev/null; then
+        return 0
+    elif sudo kill -$SIGNAL $PID 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
 # Stop livestreaming service
 echo "1️⃣  Stopping livestreaming service..."
 if [ -f "$SCRIPT_DIR/logs/livestream.pid" ]; then
     PID=$(cat "$SCRIPT_DIR/logs/livestream.pid")
     if ps -p $PID > /dev/null 2>&1; then
         echo "Killing process $PID..."
-        kill $PID 2>/dev/null || true
+        kill_process $PID || true
         sleep 2
         # Force kill if still running
         if ps -p $PID > /dev/null 2>&1; then
-            kill -9 $PID 2>/dev/null || true
+            kill_process $PID 9 || true
         fi
         echo -e "${GREEN}✅ Livestreaming service stopped${NC}"
     else
@@ -41,14 +53,26 @@ if [ -f "$SCRIPT_DIR/logs/livestream.pid" ]; then
     fi
     rm -f "$SCRIPT_DIR/logs/livestream.pid"
 else
-    # Try to find and kill by port
+    # Try to find and kill by port (API on 8080)
     if lsof -ti :8080 > /dev/null 2>&1; then
         echo "Found process on port 8080, killing..."
-        lsof -ti :8080 | xargs kill -9 2>/dev/null || true
+        lsof -ti :8080 | xargs kill -9 2>/dev/null || sudo lsof -ti :8080 | xargs sudo kill -9 2>/dev/null || true
         echo -e "${GREEN}✅ Stopped service on port 8080${NC}"
     else
         echo -e "${YELLOW}No livestreaming service found${NC}"
     fi
+fi
+
+# Also kill any stale process on signaling port 8765
+if lsof -ti :8765 > /dev/null 2>&1; then
+    echo "Found stale process on signaling port 8765, killing..."
+    STALE_PID=$(lsof -ti :8765)
+    kill_process $STALE_PID || true
+    sleep 1
+    if lsof -ti :8765 > /dev/null 2>&1; then
+        kill_process $STALE_PID 9 || true
+    fi
+    echo -e "${GREEN}✅ Cleared signaling port 8765${NC}"
 fi
 
 # Stop dashboard
