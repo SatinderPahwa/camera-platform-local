@@ -1,7 +1,7 @@
 [Unit]
 Description=Camera Platform Services - EMQX Edition (Dashboard, MQTT Processor, Config Server)
-After=network.target emqx.service docker.service
-Wants=emqx.service docker.service
+After=network-online.target emqx.service docker.service
+Wants=network-online.target emqx.service docker.service
 
 [Service]
 Type=forking
@@ -11,6 +11,7 @@ ExecStop=/bin/bash /home/satinder/camera-platform-local/scripts/managed_start.sh
 RemainAfterExit=yes
 Restart=on-failure
 RestartSec=10
+TimeoutStartSec=120
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
