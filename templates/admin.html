@@ -58,6 +58,35 @@
     </div>
 </div>
 
+<!-- Service Management -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-server me-2"></i>Service Management
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    Restart all platform services (config server, dashboard, MQTT processor, livestreaming).
+                    The page will briefly disconnect during restart.
+                </p>
+                <button class="btn btn-warning btn-sm" onclick="restartServices()">
+                    <i class="fas fa-sync-alt me-2"></i>Restart All Services
+                </button>
+
+                <div id="restart-status" class="mt-3" style="display: none;">
+                    <div class="alert" id="restart-status-alert">
+                        <i class="fas fa-spinner fa-spin me-2" id="restart-spinner"></i>
+                        <span id="restart-status-text">Restarting services...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Storage Statistics -->
 <div class="row mb-4">
     <div class="col-12">
@@ -568,6 +597,76 @@ function loadStorageStats() {
         .catch(error => console.error('Failed to load storage stats:', error));
 }
 
+
+// Service Restart
+function restartServices() {
+    if (!confirm('Restart all platform services?\n\nThe dashboard will briefly disconnect during restart.')) {
+        return;
+    }
+
+    const statusDiv = document.getElementById('restart-status');
+    const alertDiv = document.getElementById('restart-status-alert');
+    const spinner = document.getElementById('restart-spinner');
+    const statusText = document.getElementById('restart-status-text');
+
+    statusDiv.style.display = 'block';
+    alertDiv.className = 'alert alert-info';
+    spinner.style.display = 'inline-block';
+    statusText.textContent = 'Restarting services...';
+
+    function showSuccess() {
+        alertDiv.className = 'alert alert-success';
+        spinner.style.display = 'none';
+        statusText.textContent = 'Services restarted successfully.';
+    }
+
+    function showTimeout() {
+        alertDiv.className = 'alert alert-warning';
+        spinner.style.display = 'none';
+        statusText.textContent = 'Restart taking longer than expected. Refresh the page manually.';
+    }
+
+    function waitForDashboard() {
+        alertDiv.className = 'alert alert-warning';
+        statusText.textContent = 'Restart in progress. Waiting for services to come back...';
+
+        let attempts = 0;
+        const checkInterval = setInterval(function() {
+            attempts++;
+            fetch('/health')
+                .then(function(r) { return r.json(); })
+                .then(function() {
+                    clearInterval(checkInterval);
+                    showSuccess();
+                })
+                .catch(function() {});
+
+            if (attempts > 30) {
+                clearInterval(checkInterval);
+                showTimeout();
+            }
+        }, 3000);
+    }
+
+    fetch('/api/admin/restart-services', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(result) {
+        if (result.success) {
+            waitForDashboard();
+        } else {
+            alertDiv.className = 'alert alert-danger';
+            spinner.style.display = 'none';
+            statusText.textContent = 'Restart failed: ' + result.error;
+        }
+    })
+    .catch(function() {
+        // Expected - the restart kills the dashboard itself
+        waitForDashboard();
+    });
+}
 
 // Recording Cleanup Functions
 function cleanupRecordings(dryRun) {

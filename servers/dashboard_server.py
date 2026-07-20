@@ -1455,6 +1455,43 @@ def api_admin_cleanup():
             "error": str(e)
         }), 500
 
+@app.route('/api/admin/restart-services', methods=['POST'])
+@require_auth
+def api_admin_restart_services():
+    """Restart all platform services via systemctl"""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['sudo', 'systemctl', 'restart', 'camera-platform'],
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+
+        if result.returncode == 0:
+            return jsonify({
+                "success": True,
+                "message": "Services restart initiated. Dashboard will reconnect shortly."
+            })
+        else:
+            logger.error(f"Service restart failed: {result.stderr}")
+            return jsonify({
+                "success": False,
+                "error": f"Restart failed: {result.stderr}"
+            }), 500
+
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            "success": True,
+            "message": "Restart in progress (timed out waiting, but this is expected)."
+        })
+    except Exception as e:
+        logger.error(f"Service restart failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 @app.route('/api/admin/storage/stats', methods=['GET'])
 @require_auth
 def api_admin_storage_stats():
