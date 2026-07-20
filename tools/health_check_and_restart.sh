@@ -13,9 +13,15 @@ LOG_FILE="$PROJECT_DIR/logs/health_check.log"
 TIMEOUT_SECONDS=5
 MAX_CLOSE_WAIT=5
 
-# Service endpoints and ports
-CONFIG_SERVER_URL="https://localhost:80/health"
-DASHBOARD_SERVER_URL="http://localhost:5000"
+# Load LOCAL_IP from .env
+if [ -f "$PROJECT_DIR/.env" ]; then
+    LOCAL_IP=$(grep '^LOCAL_IP=' "$PROJECT_DIR/.env" | cut -d'=' -f2)
+fi
+LOCAL_IP="${LOCAL_IP:-192.168.199.218}"
+
+# Service endpoints (must match bind addresses, not localhost)
+CONFIG_SERVER_URL="https://${LOCAL_IP}:80/health"
+DASHBOARD_SERVER_URL="https://${LOCAL_IP}:5000"
 
 # Function to log with timestamp
 log() {
@@ -28,12 +34,13 @@ restart_all_services() {
 
     cd "$PROJECT_DIR"
 
-    # Restart platform services first
-    log "Restarting platform services (config, mqtt, dashboard)..."
-    if /bin/bash ./scripts/managed_start.sh restart >> "$LOG_FILE" 2>&1; then
+    # Restart via systemd (runs as root so it can kill all processes cleanly)
+    log "Restarting platform via systemctl..."
+    if sudo systemctl restart camera-platform >> "$LOG_FILE" 2>&1; then
         log "✅ Platform services restarted successfully"
     else
-        log "❌ Error during platform service restart"
+        log "❌ systemctl restart failed, falling back to managed_start.sh..."
+        /bin/bash ./scripts/managed_start.sh restart >> "$LOG_FILE" 2>&1
     fi
 
     # Restart CoTURN if it was the issue
