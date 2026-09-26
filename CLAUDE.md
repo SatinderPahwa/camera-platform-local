@@ -123,23 +123,42 @@
    sudo /etc/letsencrypt/renewal-hooks/post/fix-permissions.sh
    ```
 
-5. **Restart the platform AND CoTURN to pick up new cert:**
+5. **Restart the platform to pick up new cert:**
    ```bash
-   cd ~/camera-platform-local && ./scripts/managed_start.sh restart
+   sudo systemctl restart camera-platform
+   ```
+   ⚠️ Use `systemctl restart camera-platform` — do NOT use `./scripts/managed_start.sh restart`.
+   The platform runs under systemd as root, and managed_start.sh cannot restart root-owned
+   processes, so it leaves the dashboard dead ("stale PID file", gunicorn count 0).
+   A NOPASSWD sudoers rule allows this over SSH.
+
+6. **Restart CoTURN separately to pick up new cert:**
+   ```bash
    sudo systemctl restart coturn
    ```
-   Note: CoTURN is a separate systemd service not managed by managed_start.sh.
-   It must be restarted separately or livestreaming will fail with "ICE connecting".
+   CoTURN is a separate systemd service (not managed by systemctl camera-platform). It reads
+   the cert directly from `/etc/letsencrypt/live/cameras.pahwa.net/`, so it MUST be restarted
+   or it keeps serving the OLD (expired) cert and livestreaming fails with "ICE connecting".
+   Run this as its own command — do not chain it after another long-running restart, or it may
+   never execute. Verify it actually restarted: `systemctl show coturn -p ExecMainStartTimestamp`.
 
-6. **Verify:**
+7. **Verify (from the Mac, no sudo needed — reads the cert on the wire):**
+   ```bash
+   for p in 5000 5349; do echo | openssl s_client -connect 192.168.199.218:$p \
+     -servername cameras.pahwa.net 2>/dev/null | openssl x509 -noout -enddate -issuer; done
+   ```
+   Both ports must show the NEW expiry (~90 days out). Also confirm `Verify return code: 0 (ok)`.
    - Dashboard: `https://camera.pahwa.net:5000` - should work without cert warnings
    - Livestreaming: test from mobile (external network) to confirm TURN/TLS works
 
-7. **Clean up:** Delete the `_acme-challenge.cameras` TXT record from Squarespace DNS.
+8. **Clean up:** Delete the `_acme-challenge.cameras` TXT record from Squarespace DNS.
+   The TXT record name must be `_acme-challenge.cameras` (plural, matching cameras.pahwa.net),
+   NOT `_acme-challenge.camera`. Removing stale tokens avoids confusion at the next renewal,
+   when certbot issues a fresh random value.
 
 ### Important Notes
-- Current cert expires: **June 18, 2026**
-- Renewal window: 30 days before expiry (around May 19, 2026)
+- Current cert expires: **December 25, 2026** (last renewed 2026-09-26; 90-day cert)
+- Renewal window: 30 days before expiry (around November 25, 2026)
 - DNS is managed via Squarespace (nameservers: ns-cloud-a*.googledomains.com)
 - DO NOT use `--standalone` authenticator - port 80 is blocked by Virgin Media ISP
 - The certbot renewal config at `/etc/letsencrypt/renewal/cameras.pahwa.net.conf` may say `authenticator = manual` - this is correct
